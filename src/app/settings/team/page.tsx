@@ -33,6 +33,7 @@ export default function TeamSettingsPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "editor" | "viewer">("editor");
   const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
+  const [lastInviteEmailSent, setLastInviteEmailSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -67,6 +68,7 @@ export default function TeamSettingsPage() {
     try {
       const res = await createTeamInvite({ email: inviteEmail, role: inviteRole });
       setLastInviteLink(res.invite.invitePath);
+      setLastInviteEmailSent(res.emailSent);
       setInviteEmail("");
       await load();
     } catch (err) {
@@ -126,7 +128,9 @@ export default function TeamSettingsPage() {
               </form>
               {lastInviteLink && (
                 <p style={{ fontSize: 13, marginTop: 12 }}>
-                  초대 링크:{" "}
+                  {lastInviteEmailSent
+                    ? "초대 이메일을 보냈어요. 혹시 못 받으면 아래 링크를 직접 전달해주세요:"
+                    : "이메일 발송은 아직 연결되지 않았어요 — 아래 링크를 복사해서 직접 전달해주세요:"}{" "}
                   <code>
                     {typeof window !== "undefined"
                       ? `${window.location.origin}${lastInviteLink}`

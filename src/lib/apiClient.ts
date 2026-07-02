@@ -308,9 +308,10 @@ export function createTeamInvite(input: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   }).then((r) =>
-    handle<{ invite: { id: string; token: string; invitePath: string; expiresAt: string } }>(
-      r,
-    ),
+    handle<{
+      invite: { id: string; token: string; invitePath: string; expiresAt: string };
+      emailSent: boolean;
+    }>(r),
   );
 }
 
