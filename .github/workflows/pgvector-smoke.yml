@@ -1,0 +1,54 @@
+name: pgvector-smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: messagehouse
+          POSTGRES_PASSWORD: messagehouse
+          POSTGRES_DB: messagehouse
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U messagehouse -d messagehouse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Generate Prisma clients
+        run: |
+          npx prisma generate
+          npm run db:generate:pg
+
+      - name: Bootstrap PostgreSQL schema
+        env:
+          DATABASE_URL: postgresql://messagehouse:messagehouse@localhost:5433/messagehouse
+        run: |
+          npx prisma db push --schema prisma/schema.postgresql.prisma --accept-data-loss
+          psql "$DATABASE_URL" -f prisma/postgresql/001_enable_pgvector.sql
+
+      - name: Unit tests
+        run: npm test
+
+      - name: RAG regression diff (SQLite vs pgvector)
+        env:
+          TEST_PG_URL: postgresql://messagehouse:messagehouse@localhost:5433/messagehouse
+        run: npm run test:rag-regression

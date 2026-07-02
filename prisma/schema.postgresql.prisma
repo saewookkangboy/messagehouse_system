@@ -1,0 +1,274 @@
+// PostgreSQL 타깃 스키마 — 로컬/스테이징 PG 전환 시 사용해요.
+// 적용: DATABASE_URL=postgresql://... npx prisma db push --schema prisma/schema.postgresql.prisma
+// 임베딩 vector(1024) 변환은 prisma/postgresql/002_vector_columns.sql 을 추가 실행하세요.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma-pg"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ContextPackStatus {
+  draft
+  review
+  confirmed
+}
+
+enum ResearchStatus {
+  pending
+  completed
+  skipped
+  failed
+}
+
+enum TeamRole {
+  owner
+  admin
+  editor
+  viewer
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships    TeamMember[]
+  sessions       Session[]
+  orgDocuments   OrgDocument[] @relation("OrgDocumentUploader")
+  contextPacks   ContextPack[] @relation("ContextPackCreator")
+  invitesSent    TeamInvite[]  @relation("InviteSender")
+  integrations   IntegrationConnection[]
+  exports        ExportDestination[] @relation("ExportDestinationUser")
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members      TeamMember[]
+  contextPacks ContextPack[]
+  orgDocuments OrgDocument[]
+  invites      TeamInvite[]
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    String
+  role      TeamRole @default(editor)
+  createdAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ContextPack {
+  id       String            @id @default(cuid())
+  issue    String            @default("제목 없는 이슈")
+  industry String?
+  status   ContextPackStatus @default(draft)
+  version  String            @default("0.1")
+
+  teamId      String?
+  team        Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdById String?
+  createdBy   User?   @relation("ContextPackCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  roofMessage    String?
+  pillars        String?
+  foundation     String?
+  objections     String?
+  aieoSummary    String?
+  riskFlags      String?
+  forbiddenTerms String?
+  officialTerms  String?
+
+  researchResult String?
+  researchedAt   DateTime?
+  researchStatus ResearchStatus @default(pending)
+
+  analyzedAt  DateTime?
+  generatedAt DateTime?
+  confirmedAt DateTime?
+
+  pipelineRunningStep String?
+  pipelineError       String?
+  pipelineErrorStep   String?
+
+  gateMessageReviewed Boolean @default(false)
+  gateNoConfidential  Boolean @default(false)
+  gateNumbersVerified Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  files SourceFile[]
+
+  exportDestinations ExportDestination[]
+
+  @@index([teamId])
+  @@index([updatedAt])
+  @@index([status, updatedAt])
+}
+
+model SourceFile {
+  id            String      @id @default(cuid())
+  contextPackId String
+  contextPack   ContextPack @relation(fields: [contextPackId], references: [id], onDelete: Cascade)
+
+  filename      String
+  mimeType      String
+  sizeBytes     Int
+  extractedText String
+
+  docType  String?
+  topic    String?
+  claim    String?
+  numbers  String?
+  terms    String?
+  audience String?
+  risk     String?
+
+  analyzedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  chunks DocumentChunk[]
+
+  @@index([contextPackId])
+}
+
+model DocumentChunk {
+  id            String     @id @default(cuid())
+  sourceFileId  String
+  sourceFile    SourceFile @relation(fields: [sourceFileId], references: [id], onDelete: Cascade)
+  contextPackId String
+
+  chunkIndex Int
+  text       String
+  /// db push 후 002_vector_columns.sql 로 vector(1024) 로 변환해요
+  embedding  String
+  model      String
+
+  createdAt DateTime @default(now())
+
+  @@unique([sourceFileId, chunkIndex])
+  @@index([sourceFileId])
+  @@index([contextPackId])
+}
+
+model OrgDocument {
+  id           String  @id @default(cuid())
+  teamId       String
+  team         Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  uploadedById String?
+  uploadedBy   User?   @relation("OrgDocumentUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  title         String
+  description   String?
+  filename      String
+  mimeType      String
+  sizeBytes     Int
+  extractedText String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chunks OrgDocumentChunk[]
+
+  @@index([teamId])
+}
+
+model OrgDocumentChunk {
+  id            String      @id @default(cuid())
+  orgDocumentId String
+  orgDocument   OrgDocument @relation(fields: [orgDocumentId], references: [id], onDelete: Cascade)
+
+  chunkIndex Int
+  text       String
+  embedding  String
+  model      String
+
+  createdAt DateTime @default(now())
+
+  @@unique([orgDocumentId, chunkIndex])
+  @@index([orgDocumentId])
+}
+
+model TeamInvite {
+  id          String    @id @default(cuid())
+  teamId      String
+  team        Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  email       String
+  role        TeamRole  @default(editor)
+  token       String    @unique
+  invitedById String
+  invitedBy   User      @relation("InviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([teamId])
+  @@index([email])
+}
+
+enum IntegrationProvider {
+  google_drive
+  notion
+}
+
+model IntegrationConnection {
+  id           String              @id @default(cuid())
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     IntegrationProvider
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  metadata     String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@unique([userId, provider])
+  @@index([userId])
+}
+
+model ExportDestination {
+  id            String              @id @default(cuid())
+  contextPackId String
+  contextPack   ContextPack         @relation(fields: [contextPackId], references: [id], onDelete: Cascade)
+  provider      IntegrationProvider
+  externalId    String
+  url           String
+  format        String              @default("markdown")
+  exportedById  String?
+  exportedBy    User?               @relation("ExportDestinationUser", fields: [exportedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([contextPackId, provider])
+  @@index([contextPackId])
+}

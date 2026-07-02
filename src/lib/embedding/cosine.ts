@@ -1,0 +1,21 @@
+export function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length || a.length === 0) return 0;
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i]! * b[i]!;
+    normA += a[i]! * a[i]!;
+    normB += b[i]! * b[i]!;
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 0 : dot / denom;
+}
+
+export function l2Normalize(vector: number[]): number[] {
+  let norm = 0;
+  for (const v of vector) norm += v * v;
+  norm = Math.sqrt(norm);
+  if (norm === 0) return vector;
+  return vector.map((v) => v / norm);
+}

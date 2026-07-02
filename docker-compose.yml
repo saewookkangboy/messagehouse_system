@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: messagehouse-pg
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: messagehouse
+      POSTGRES_PASSWORD: messagehouse
+      POSTGRES_DB: messagehouse
+    volumes:
+      - messagehouse_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U messagehouse -d messagehouse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  messagehouse_pg_data:
