@@ -7,6 +7,8 @@ import {
   sessionExpiry,
   SESSION_COOKIE,
 } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/rateLimit";
+import { requestIp } from "@/lib/requestIp";
 
 const RegisterSchema = z.object({
   email: z.string().email(),
@@ -16,6 +18,17 @@ const RegisterSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const { allowed, retryAfterMs } = checkRateLimit(`register:${requestIp(request)}`, {
+    limit: 5,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "가입 시도가 너무 많아요. 잠시 후 다시 시도해주세요." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) } },
+    );
+  }
+
   const parsed = RegisterSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
     return NextResponse.json(

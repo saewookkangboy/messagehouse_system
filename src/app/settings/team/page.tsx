@@ -48,9 +48,15 @@ export default function TeamSettingsPage() {
   }
 
   useEffect(() => {
-    load()
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+    (async () => {
+      try {
+        await load();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "불러오는 중 오류가 발생했어요.");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   async function changeRole(userId: string, role: "admin" | "editor" | "viewer") {

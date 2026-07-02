@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { isSameOrigin } from "@/lib/csrf";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -12,11 +13,23 @@ const PUBLIC_PATHS = [
 ];
 
 export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  if (
+    pathname.startsWith("/api/") &&
+    !isSameOrigin({
+      method: request.method,
+      originHeader: request.headers.get("origin"),
+      refererHeader: request.headers.get("referer"),
+      requestOrigin: request.nextUrl.origin,
+    })
+  ) {
+    return NextResponse.json({ error: "요청 출처를 확인할 수 없어요." }, { status: 403 });
+  }
+
   if (process.env.AUTH_DISABLED === "true") {
     return NextResponse.next();
   }
-
-  const { pathname } = request.nextUrl;
   if (
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
     pathname.startsWith("/_next") ||

@@ -4,7 +4,15 @@ const ALGO = "aes-256-gcm";
 const IV_LEN = 12;
 
 function getKey(): Buffer {
-  const secret = process.env.INTEGRATION_TOKEN_SECRET ?? "messagehouse-dev-integration-secret";
+  const secret = process.env.INTEGRATION_TOKEN_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "INTEGRATION_TOKEN_SECRET가 설정되지 않았어요. 프로덕션에서는 OAuth 토큰 암호화 키를 반드시 설정해야 해요.",
+      );
+    }
+    return createHash("sha256").update("messagehouse-dev-integration-secret").digest();
+  }
   return createHash("sha256").update(secret).digest();
 }
 

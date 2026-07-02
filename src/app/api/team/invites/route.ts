@@ -11,6 +11,7 @@ import {
 import { authErrorResponse } from "@/lib/auth/api";
 import { requireAuth } from "@/lib/auth/session";
 import { getEmailProvider } from "@/lib/email";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 const CreateInviteSchema = z.object({
   email: z.string().email(),
@@ -42,6 +43,17 @@ export async function POST(request: Request) {
     const auth = await requireAuth("admin");
     if (!auth) {
       return NextResponse.json({ error: "로그인이 필요해요." }, { status: 401 });
+    }
+
+    const { allowed, retryAfterMs } = checkRateLimit(`invite:${auth.teamId}`, {
+      limit: 20,
+      windowMs: 60 * 60 * 1000,
+    });
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "초대 생성이 너무 많아요. 잠시 후 다시 시도해주세요." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) } },
+      );
     }
 
     const parsed = CreateInviteSchema.safeParse(await request.json().catch(() => ({})));

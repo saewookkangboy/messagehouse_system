@@ -3,6 +3,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth/password";
 import { newSessionToken, sessionExpiry, SESSION_COOKIE } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/rateLimit";
+import { requestIp } from "@/lib/requestIp";
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -10,6 +12,17 @@ const LoginSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const { allowed, retryAfterMs } = checkRateLimit(`login:${requestIp(request)}`, {
+    limit: 10,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "로그인 시도가 너무 많아요. 잠시 후 다시 시도해주세요." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) } },
+    );
+  }
+
   const parsed = LoginSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
     return NextResponse.json({ error: "이메일과 비밀번호를 입력해주세요." }, { status: 400 });

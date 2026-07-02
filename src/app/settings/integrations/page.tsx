@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Header } from "@/components/Header";
 import {
   disconnectIntegration,
@@ -49,15 +50,21 @@ function IntegrationsSettingsInner() {
   }
 
   useEffect(() => {
-    const errKey = searchParams.get("error");
-    const connected = searchParams.get("connected");
-    if (errKey) setError(ERROR_MESSAGES[errKey] ?? "연동 중 오류가 발생했어요.");
-    if (connected === "google") setSuccess("Google Drive 연동이 완료되었어요.");
-    if (connected === "notion") setSuccess("Notion 연동이 완료되었어요.");
+    (async () => {
+      const errKey = searchParams.get("error");
+      const connected = searchParams.get("connected");
+      if (errKey) setError(ERROR_MESSAGES[errKey] ?? "연동 중 오류가 발생했어요.");
+      if (connected === "google") setSuccess("Google Drive 연동이 완료되었어요.");
+      if (connected === "notion") setSuccess("Notion 연동이 완료되었어요.");
 
-    load()
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      try {
+        await load();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "불러오는 중 오류가 발생했어요.");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [searchParams]);
 
   const googleConn = connections.find((c) => c.provider === "google_drive");
@@ -197,7 +204,7 @@ function IntegrationsSettingsInner() {
                   </div>
                 </>
               ) : (
-                <a
+                <Link
                   href="/api/integrations/google/connect"
                   className={`btn btn-primary${!configured.google ? " disabled" : ""}`}
                   aria-disabled={!configured.google}
@@ -206,7 +213,7 @@ function IntegrationsSettingsInner() {
                   }}
                 >
                   Google Drive 연결
-                </a>
+                </Link>
               )}
             </div>
 
@@ -276,7 +283,7 @@ function IntegrationsSettingsInner() {
                   </div>
                 </>
               ) : (
-                <a
+                <Link
                   href="/api/integrations/notion/connect"
                   className={`btn btn-primary${!configured.notion ? " disabled" : ""}`}
                   aria-disabled={!configured.notion}
@@ -285,7 +292,7 @@ function IntegrationsSettingsInner() {
                   }}
                 >
                   Notion 연결
-                </a>
+                </Link>
               )}
             </div>
           </>
