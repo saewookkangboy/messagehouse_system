@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
+  buildInviteEmail,
   createTeamInvite,
   InviteError,
   isInvitableRole,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/auth/invite";
 import { authErrorResponse } from "@/lib/auth/api";
 import { requireAuth } from "@/lib/auth/session";
+import { getEmailProvider } from "@/lib/email";
 
 const CreateInviteSchema = z.object({
   email: z.string().email(),
@@ -57,7 +59,25 @@ export async function POST(request: Request) {
       invitedById: auth.user.id,
     });
 
-    return NextResponse.json({ invite }, { status: 201 });
+    const email = buildInviteEmail({
+      teamName: auth.teamName,
+      role: parsed.data.role,
+      invitedByName: auth.user.name,
+      inviteUrl: new URL(invite.invitePath, request.url).toString(),
+    });
+    let emailSent = false;
+    try {
+      const result = await getEmailProvider().send({
+        to: parsed.data.email,
+        subject: email.subject,
+        text: email.text,
+      });
+      emailSent = result.sent;
+    } catch {
+      // 이메일 발송 실패는 초대 생성 자체를 막지 않아요 — 링크 복사로 여전히 초대할 수 있어요.
+    }
+
+    return NextResponse.json({ invite, emailSent }, { status: 201 });
   } catch (err) {
     const res = authErrorResponse(err);
     if (res) return res;

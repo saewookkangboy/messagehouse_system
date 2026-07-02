@@ -45,7 +45,14 @@ jobs:
           npx prisma db push --schema prisma/schema.postgresql.prisma --accept-data-loss
           psql "$DATABASE_URL" -f prisma/postgresql/001_enable_pgvector.sql
 
+      - name: Bootstrap SQLite schema
+        env:
+          DATABASE_URL: "file:./dev.db"
+        run: npx prisma migrate deploy
+
       - name: Unit tests
+        env:
+          DATABASE_URL: "file:./dev.db"
         run: npm test
 
       - name: RAG regression diff (SQLite vs pgvector)

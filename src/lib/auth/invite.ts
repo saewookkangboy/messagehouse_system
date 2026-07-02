@@ -37,6 +37,24 @@ export function buildInvitePath(token: string): string {
   return `/invite/${token}`;
 }
 
+const ROLE_LABEL: Record<InvitableRole, string> = {
+  admin: "관리자",
+  editor: "편집자",
+  viewer: "뷰어",
+};
+
+export function buildInviteEmail(input: {
+  teamName: string;
+  role: InvitableRole;
+  invitedByName: string;
+  inviteUrl: string;
+}): { subject: string; text: string } {
+  return {
+    subject: `${input.invitedByName}님이 "${input.teamName}" 팀에 초대했어요`,
+    text: `${input.invitedByName}님이 회원님을 "${input.teamName}" 팀에 ${ROLE_LABEL[input.role]} 권한으로 초대했어요.\n\n아래 링크에서 초대를 수락해주세요 (7일 이내):\n${input.inviteUrl}`,
+  };
+}
+
 export async function createTeamInvite(input: {
   teamId: string;
   email: string;
