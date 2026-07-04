@@ -355,4 +355,10 @@ export function streamPipelineUrl(
   return `/api/context-packs/${id}/pipeline/stream?${params}`;
 }
 
+export function deleteAccount() {
+  return fetch("/api/account", { method: "DELETE" }).then((r) => handle<{ ok: true }>(r));
+}
+
+export const accountExportUrl = "/api/account/export";
+
 export type { ContextPack, SourceFile };

@@ -74,6 +74,9 @@ export function Header({ subtitle }: { subtitle?: string }) {
               <Link href="/settings/team" className="header-link" onClick={() => setMenuOpen(false)}>
                 팀 설정
               </Link>
+              <Link href="/settings/account" className="header-link" onClick={() => setMenuOpen(false)}>
+                계정
+              </Link>
             </>
           )}
           {authEnabled && user ? (
