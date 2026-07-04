@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { buildGeneratePrompt } from "./prompts";
+import { buildAnalyzePrompt, buildGeneratePrompt } from "./prompts";
+
+describe("buildAnalyzePrompt", () => {
+  it("instructs a non-empty fallback for numbers and terms when absent", () => {
+    const prompt = buildAnalyzePrompt("메모.txt", "아무 내용");
+    expect(prompt).toContain("포함된 수치가 없어요");
+    expect(prompt).toContain("특별한 공식 용어 없음");
+    expect(prompt).toContain("빈 문자열");
+  });
+});
 
 describe("buildGeneratePrompt", () => {
   it("includes RAG chunks when provided", () => {

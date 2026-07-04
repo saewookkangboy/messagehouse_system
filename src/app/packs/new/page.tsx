@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 import {
@@ -26,30 +26,38 @@ export default function NewContextPackPage() {
   const [dragOver, setDragOver] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
-  const [creating, setCreating] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const createStarted = useRef(false);
+  const packIdRef = useRef<string | null>(null);
+  const packPromiseRef = useRef<Promise<string> | null>(null);
 
-  useEffect(() => {
-    if (createStarted.current) return;
-    createStarted.current = true;
-    createContextPack()
-      .then((res) => {
-        setPackId(res.contextPack.id);
-        setIssue(res.contextPack.issue);
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setCreating(false));
+  // Visiting or reloading this page shouldn't create an empty draft pack —
+  // only lazily create one on the first real action (upload, meta edit, or
+  // starting analysis), memoized so concurrent callers share one creation.
+  const ensurePack = useCallback((): Promise<string> => {
+    if (packIdRef.current) return Promise.resolve(packIdRef.current);
+    if (!packPromiseRef.current) {
+      packPromiseRef.current = createContextPack()
+        .then((res) => {
+          packIdRef.current = res.contextPack.id;
+          setPackId(res.contextPack.id);
+          return res.contextPack.id;
+        })
+        .catch((e) => {
+          packPromiseRef.current = null;
+          throw e;
+        });
+    }
+    return packPromiseRef.current;
   }, []);
 
   const handleFiles = useCallback(
     async (fileList: FileList | File[]) => {
-      if (!packId) return;
       const arr = Array.from(fileList);
       if (arr.length === 0) return;
       try {
-        const res = await uploadFiles(packId, arr);
+        const id = await ensurePack();
+        const res = await uploadFiles(id, arr);
         setFiles((prev) => [...prev, ...res.files]);
         setWarning(
           res.errors.length
@@ -62,7 +70,7 @@ export default function NewContextPackPage() {
         setWarning(e instanceof Error ? e.message : "파일 업로드 중 오류가 발생했어요.");
       }
     },
-    [packId],
+    [ensurePack],
   );
 
   async function handleRemove(fileId: string) {
@@ -72,21 +80,23 @@ export default function NewContextPackPage() {
   }
 
   async function saveMeta() {
-    if (!packId) return;
-    await patchContextPack(packId, {
+    if (!issue.trim() && !industry.trim()) return;
+    const id = await ensurePack();
+    await patchContextPack(id, {
       issue: issue.trim() || undefined,
       industry: industry.trim() || null,
     }).catch(() => {});
   }
 
   async function startAnalysis() {
-    if (!packId || files.length === 0) return;
+    if (files.length === 0) return;
     setStarting(true);
     setError(null);
     try {
+      const id = await ensurePack();
       await saveMeta();
-      await analyzeContextPack(packId);
-      router.push(`/packs/${packId}/analysis`);
+      await analyzeContextPack(id);
+      router.push(`/packs/${id}/analysis`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "분석을 시작하지 못했어요.");
       setStarting(false);
@@ -251,7 +261,7 @@ export default function NewContextPackPage() {
           <button
             type="button"
             className="btn btn-primary"
-            disabled={creating || !packId || files.length === 0 || starting}
+            disabled={files.length === 0 || starting}
             onClick={startAnalysis}
           >
             {starting ? "분석 시작 중..." : "분석 시작"}

@@ -76,6 +76,7 @@ export default function AnalysisPage({
   const [loading, setLoading] = useState(true);
   const [research, setResearch] = useState<ResearchResult | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pipelineStarted = useRef(false);
 
@@ -93,19 +94,16 @@ export default function AnalysisPage({
     [],
   );
 
-  useEffect(() => {
-    if (pipelineStarted.current) return;
-    pipelineStarted.current = true;
+  const runAndPoll = useCallback(
+    async (options: { force?: boolean }) => {
+      const poll = setInterval(() => {
+        getPipelineStatus(id)
+          .then((res) => setPipeline(res.pipeline))
+          .catch(() => {});
+      }, 800);
 
-    const poll = setInterval(() => {
-      getPipelineStatus(id)
-        .then((res) => setPipeline(res.pipeline))
-        .catch(() => {});
-    }, 800);
-
-    (async () => {
       try {
-        const res = await runPipeline(id, { target: "researched" });
+        const res = await runPipeline(id, { target: "researched", ...options });
         applyPipelineResult(res);
       } catch (e) {
         setError(e instanceof Error ? e.message : "분석 중 오류가 발생했어요.");
@@ -119,12 +117,23 @@ export default function AnalysisPage({
         }
       } finally {
         clearInterval(poll);
-        setLoading(false);
       }
-    })();
+    },
+    [id, applyPipelineResult],
+  );
 
-    return () => clearInterval(poll);
-  }, [id, applyPipelineResult]);
+  useEffect(() => {
+    if (pipelineStarted.current) return;
+    pipelineStarted.current = true;
+    runAndPoll({}).finally(() => setLoading(false));
+  }, [runAndPoll]);
+
+  async function handleRetry() {
+    setRetrying(true);
+    setError(null);
+    await runAndPoll({ force: true });
+    setRetrying(false);
+  }
 
   async function handleGenerate() {
     setGenerating(true);
@@ -152,7 +161,22 @@ export default function AnalysisPage({
           정리했어요.
         </p>
 
-        {(loading || pipeline?.runningStep) && <PipelineProgress pipeline={pipeline} />}
+        {(loading || pipeline?.runningStep || pipeline?.error) && (
+          <PipelineProgress pipeline={pipeline} />
+        )}
+
+        {pipeline?.error && !loading && (
+          <div className="btn-row" style={{ marginBottom: 16 }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={retrying}
+              onClick={handleRetry}
+            >
+              {retrying ? "다시 시도하는 중..." : "분석 다시 시도하기"}
+            </button>
+          </div>
+        )}
 
         {loading && !pipeline && (
           <div className="callout">

@@ -7,6 +7,7 @@ import { getMe, logout } from "@/lib/apiClient";
 export function Header({ subtitle }: { subtitle?: string }) {
   const [user, setUser] = useState<{ name: string; teamName?: string } | null>(null);
   const [authEnabled, setAuthEnabled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     getMe()
@@ -42,26 +43,53 @@ export function Header({ subtitle }: { subtitle?: string }) {
             <span className="sub">{subtitle ?? "PR Message OS · Agent 1"}</span>
           </div>
         </Link>
-        <nav style={{ display: "flex", gap: 12, alignItems: "center", fontSize: 13 }}>
-          <Link href="/org-documents" className="row-action">조직 문서</Link>
+        <button
+          type="button"
+          className="header-menu-toggle"
+          aria-label={menuOpen ? "메뉴 닫기" : "메뉴 열기"}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((v) => !v)}
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            {menuOpen ? (
+              <path d="M18 6L6 18M6 6l12 12" />
+            ) : (
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            )}
+          </svg>
+        </button>
+        <nav className={`header-nav${menuOpen ? " open" : ""}`}>
+          <Link href="/org-documents" className="header-link" onClick={() => setMenuOpen(false)}>
+            조직 문서
+          </Link>
           {authEnabled && user && (
             <>
-              <Link href="/settings/integrations" className="row-action">연동</Link>
-              <Link href="/settings/team" className="row-action">팀 설정</Link>
+              <Link
+                href="/settings/integrations"
+                className="header-link"
+                onClick={() => setMenuOpen(false)}
+              >
+                연동
+              </Link>
+              <Link href="/settings/team" className="header-link" onClick={() => setMenuOpen(false)}>
+                팀 설정
+              </Link>
             </>
           )}
           {authEnabled && user ? (
             <>
-              <span style={{ color: "var(--muted)" }}>
+              <span className="header-user">
                 {user.name}
                 {user.teamName ? ` · ${user.teamName}` : ""}
               </span>
-              <button type="button" className="row-action" onClick={handleLogout}>
+              <button type="button" className="header-link" onClick={handleLogout}>
                 로그아웃
               </button>
             </>
           ) : authEnabled ? (
-            <Link href="/login" className="row-action">로그인</Link>
+            <Link href="/login" className="header-link" onClick={() => setMenuOpen(false)}>
+              로그인
+            </Link>
           ) : null}
         </nav>
       </div>

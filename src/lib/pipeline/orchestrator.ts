@@ -14,6 +14,11 @@ import {
   setPipelineError,
   setPipelineRunning,
 } from "./persistence";
+import type { AnalyzeStepResult } from "./schema";
+
+function summarizeAnalyzeErrors(errors: AnalyzeStepResult["errors"]): string {
+  return errors.map((e) => `${e.filename}: ${e.message}`).join("\n");
+}
 import { derivePipelineStatus, targetSteps } from "./status";
 import { runAnalyzeStep, runGenerateStep, runResearchStep } from "./steps";
 
@@ -61,6 +66,11 @@ async function runStep(
           where: { id: packId },
           data: { analyzedAt: new Date() },
         });
+      } else if (result.analyze.errors.length > 0) {
+        // Per-file failures (e.g. AI response failed schema validation) don't
+        // throw — without this, a failed file leaves the pack stuck looking
+        // like analysis is still "pending" forever, with no visible error.
+        await setPipelineError(packId, "analyze", summarizeAnalyzeErrors(result.analyze.errors));
       }
       break;
     }
