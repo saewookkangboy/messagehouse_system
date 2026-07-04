@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "로그인이 필요해요." }, { status: 401 });
     }
 
-    const { allowed, retryAfterMs } = checkRateLimit(`invite:${auth.teamId}`, {
+    const { allowed, retryAfterMs } = await checkRateLimit(`invite:${auth.teamId}`, {
       limit: 20,
       windowMs: 60 * 60 * 1000,
     });

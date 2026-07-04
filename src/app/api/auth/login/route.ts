@@ -12,7 +12,7 @@ const LoginSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const { allowed, retryAfterMs } = checkRateLimit(`login:${requestIp(request)}`, {
+  const { allowed, retryAfterMs } = await checkRateLimit(`login:${requestIp(request)}`, {
     limit: 10,
     windowMs: 10 * 60 * 1000,
   });

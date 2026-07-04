@@ -18,7 +18,7 @@ const RegisterSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const { allowed, retryAfterMs } = checkRateLimit(`register:${requestIp(request)}`, {
+  const { allowed, retryAfterMs } = await checkRateLimit(`register:${requestIp(request)}`, {
     limit: 5,
     windowMs: 60 * 60 * 1000,
   });
