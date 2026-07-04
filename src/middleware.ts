@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   "/api/auth/register",
   "/api/auth/me",
   "/api/invites",
+  "/api/maintenance",
 ];
 
 export function middleware(request: NextRequest) {

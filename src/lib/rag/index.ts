@@ -8,6 +8,7 @@ import {
 } from "@/lib/embedding/vectorSearch";
 import { isAuthEnabled } from "@/lib/auth/types";
 import { getDemoTeamId } from "@/lib/auth/session";
+import { decryptField, encryptField } from "@/lib/fieldCrypto";
 import { chunkText } from "./chunking";
 import { DEFAULT_TOP_K, type RetrievedChunk } from "./schema";
 
@@ -28,7 +29,8 @@ export async function indexSourceFile(sourceFileId: string): Promise<number> {
   }
 
   const provider = getEmbeddingProvider();
-  const pieces = chunkText(file.extractedText);
+  // 청킹·임베딩은 평문에서, 저장은 암호화해서. (extractedText는 암호화 저장돼 있을 수 있어요)
+  const pieces = chunkText(decryptField(file.extractedText));
   await db.documentChunk.deleteMany({ where: { sourceFileId } });
 
   if (pieces.length === 0) return 0;
@@ -43,7 +45,7 @@ export async function indexSourceFile(sourceFileId: string): Promise<number> {
         sourceFileId,
         contextPackId: file.contextPackId,
         chunkIndex,
-        text: pieces[chunkIndex]!,
+        text: encryptField(pieces[chunkIndex]!),
         embedding: vectors[chunkIndex]!,
         model: provider.modelId,
         createdAt,
@@ -55,7 +57,7 @@ export async function indexSourceFile(sourceFileId: string): Promise<number> {
         sourceFileId,
         contextPackId: file.contextPackId,
         chunkIndex,
-        text,
+        text: encryptField(text),
         embedding: JSON.stringify(vectors[chunkIndex]),
         model: provider.modelId,
       })),
@@ -86,7 +88,7 @@ export async function indexOrgDocument(orgDocumentId: string): Promise<number> {
   }
 
   const provider = getEmbeddingProvider();
-  const pieces = chunkText(doc.extractedText);
+  const pieces = chunkText(decryptField(doc.extractedText));
   await db.orgDocumentChunk.deleteMany({ where: { orgDocumentId } });
 
   if (pieces.length === 0) return 0;
@@ -100,7 +102,7 @@ export async function indexOrgDocument(orgDocumentId: string): Promise<number> {
         id: newChunkId(),
         orgDocumentId,
         chunkIndex,
-        text: pieces[chunkIndex]!,
+        text: encryptField(pieces[chunkIndex]!),
         embedding: vectors[chunkIndex]!,
         model: provider.modelId,
         createdAt,
@@ -111,7 +113,7 @@ export async function indexOrgDocument(orgDocumentId: string): Promise<number> {
       data: pieces.map((text, chunkIndex) => ({
         orgDocumentId,
         chunkIndex,
-        text,
+        text: encryptField(text),
         embedding: JSON.stringify(vectors[chunkIndex]),
         model: provider.modelId,
       })),

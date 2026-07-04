@@ -8,6 +8,7 @@ import {
   serializeStringList,
 } from "@/lib/contextPackSerialization";
 import { buildRagContextForAnalysis, retrieveRelevantChunks } from "@/lib/rag";
+import { decryptField } from "@/lib/fieldCrypto";
 import type {
   AnalyzeStepResult,
   GenerateStepResult,
@@ -42,7 +43,7 @@ export async function runAnalyzeStep(packId: string): Promise<AnalyzeStepResult>
     try {
       const rag = await buildRagContextForAnalysis({
         sourceFileId: file.id,
-        text: file.extractedText,
+        text: decryptField(file.extractedText),
         teamId: pack.teamId,
       });
       const analysis = await provider.analyzeDocument({

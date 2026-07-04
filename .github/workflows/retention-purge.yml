@@ -1,0 +1,38 @@
+name: retention-purge
+
+# 매일 03:00 UTC(12:00 KST)에 보존 기간 지난 업로드 원본 파일을 정리해요.
+# 배포된 앱의 /api/maintenance/purge 엔드포인트를 시크릿으로 호출합니다.
+#
+# 필요 시크릿 (Settings → Secrets and variables → Actions):
+#   APP_URL            예: https://messagehouse.example.com
+#   MAINTENANCE_SECRET 앱의 MAINTENANCE_SECRET 환경변수와 동일한 값
+#
+# APP_URL이 없으면 스킵돼요(미배포 환경에서 실패하지 않도록).
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call retention purge endpoint
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          MAINTENANCE_SECRET: ${{ secrets.MAINTENANCE_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$MAINTENANCE_SECRET" ]; then
+            echo "APP_URL 또는 MAINTENANCE_SECRET 미설정 — 정리 스킵"
+            exit 0
+          fi
+          code=$(curl -s -o /tmp/purge.json -w "%{http_code}" \
+            -X POST "$APP_URL/api/maintenance/purge" \
+            -H "x-maintenance-secret: $MAINTENANCE_SECRET")
+          echo "HTTP $code"
+          cat /tmp/purge.json
+          if [ "$code" != "200" ]; then
+            echo "정리 실패"
+            exit 1
+          fi

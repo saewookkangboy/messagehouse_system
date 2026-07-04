@@ -8,6 +8,7 @@ import {
   UnsupportedFileTypeError,
 } from "@/lib/fileParsing";
 import { indexOrgDocument } from "@/lib/rag";
+import { encryptField } from "@/lib/fieldCrypto";
 import { AuthError, requireAuth, resolveTeamId } from "@/lib/auth/session";
 import { authErrorResponse } from "@/lib/auth/api";
 
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
         filename: file.name,
         mimeType: file.type || "application/octet-stream",
         sizeBytes: file.size,
-        extractedText: text,
+        extractedText: encryptField(text),
       },
     });
 

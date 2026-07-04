@@ -2,6 +2,7 @@ import type { AppPrismaClient } from "@/lib/db/types";
 import { db } from "@/lib/db";
 import { embeddingToPgVectorLiteral } from "@/lib/embedding/parseEmbedding";
 import { EMBEDDING_DIMENSIONS } from "@/lib/embedding/schema";
+import { decryptField } from "@/lib/fieldCrypto";
 import type { RetrievedChunk } from "@/lib/rag/schema";
 import type { OrgChunkSearchInput, PackChunkSearchInput, VectorSearch } from "./types";
 
@@ -16,7 +17,7 @@ function toRetrievedChunk(row: ScoredRow, source: RetrievedChunk["source"]): Ret
   return {
     filename: row.filename,
     chunkIndex: row.chunk_index,
-    text: row.text,
+    text: decryptField(row.text),
     score: Number(row.score),
     source,
   };

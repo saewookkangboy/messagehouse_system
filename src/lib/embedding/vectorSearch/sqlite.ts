@@ -2,6 +2,7 @@ import type { AppPrismaClient } from "@/lib/db/types";
 import { db } from "@/lib/db";
 import { cosineSimilarity } from "@/lib/embedding/cosine";
 import { parseEmbeddingJson } from "@/lib/embedding/parseEmbedding";
+import { decryptField } from "@/lib/fieldCrypto";
 import type { RetrievedChunk } from "@/lib/rag/schema";
 import type { OrgChunkSearchInput, PackChunkSearchInput, VectorSearch } from "./types";
 
@@ -19,7 +20,7 @@ function rankChunks(
   const scored = rows.map((row) => ({
     filename: row.filename,
     chunkIndex: row.chunkIndex,
-    text: row.text,
+    text: decryptField(row.text),
     score: cosineSimilarity(queryVector, parseEmbeddingJson(row.embedding)),
     source: row.source,
   }));
