@@ -6,7 +6,7 @@ import { Header } from "@/components/Header";
 import {
   generateContextPack,
   getPipelineStatus,
-  runPipeline,
+  streamPipelineUrl,
   type ContextPack,
   type SourceFile,
 } from "@/lib/apiClient";
@@ -80,58 +80,83 @@ export default function AnalysisPage({
   const [error, setError] = useState<string | null>(null);
   const pipelineStarted = useRef(false);
 
-  const applyPipelineResult = useCallback(
-    (res: Awaited<ReturnType<typeof runPipeline>>) => {
-      setPack(res.contextPack);
-      setFiles(res.contextPack.files);
-      setPipeline(res.pipeline);
-      if (res.research?.research) {
-        setResearch(res.research.research);
-      } else if (res.contextPack.researchResult) {
-        setResearch(deserializeResearchResult(res.contextPack.researchResult));
+  const syncFinalState = useCallback(async () => {
+    try {
+      const status = await getPipelineStatus(id);
+      setPipeline(status.pipeline);
+      setPack(status.contextPack);
+      setFiles(status.contextPack.files);
+      if (status.contextPack.researchResult) {
+        setResearch(deserializeResearchResult(status.contextPack.researchResult));
       }
-    },
-    [],
-  );
+    } catch {
+      /* ignore */
+    }
+  }, [id]);
 
-  const runAndPoll = useCallback(
-    async (options: { force?: boolean }) => {
-      const poll = setInterval(() => {
-        getPipelineStatus(id)
-          .then((res) => setPipeline(res.pipeline))
-          .catch(() => {});
-      }, 800);
+  // SSE 스트림으로 파이프라인을 실행하며 단계별 진행을 실시간 반영해요.
+  const runWithStream = useCallback(
+    (options: { force?: boolean }) =>
+      new Promise<void>((resolve) => {
+        const url =
+          streamPipelineUrl(id, { target: "researched" }) +
+          (options.force ? "&force=true" : "");
+        const es = new EventSource(url);
+        let settled = false;
 
-      try {
-        const res = await runPipeline(id, { target: "researched", ...options });
-        applyPipelineResult(res);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "분석 중 오류가 발생했어요.");
-        try {
-          const status = await getPipelineStatus(id);
-          setPipeline(status.pipeline);
-          setPack(status.contextPack);
-          setFiles(status.contextPack.files);
-        } catch {
-          /* ignore */
-        }
-      } finally {
-        clearInterval(poll);
-      }
-    },
-    [id, applyPipelineResult],
+        const finish = async () => {
+          if (settled) return;
+          settled = true;
+          es.close();
+          await syncFinalState();
+          resolve();
+        };
+
+        es.addEventListener("step_start", (e) => {
+          const d = JSON.parse((e as MessageEvent).data) as { step: PipelineStep };
+          // 해당 단계를 즉시 running으로 표시(낙관적)
+          setPipeline((prev) =>
+            prev
+              ? { ...prev, runningStep: d.step, steps: { ...prev.steps, [d.step]: "running" } }
+              : prev,
+          );
+        });
+        es.addEventListener("status", (e) => {
+          const d = JSON.parse((e as MessageEvent).data) as { pipeline: PipelineStatus };
+          setPipeline(d.pipeline);
+        });
+        es.addEventListener("done", (e) => {
+          const d = JSON.parse((e as MessageEvent).data) as { pipeline: PipelineStatus };
+          setPipeline(d.pipeline);
+          void finish();
+        });
+        es.addEventListener("error", (e) => {
+          // 서버가 보낸 error 이벤트는 data가 있어요. 연결 오류(native)는 data가 없어요.
+          const data = (e as MessageEvent).data;
+          if (data) {
+            try {
+              const d = JSON.parse(data) as { message?: string };
+              setError(d.message ?? "분석 중 오류가 발생했어요.");
+            } catch {
+              setError("분석 중 오류가 발생했어요.");
+            }
+          }
+          void finish();
+        });
+      }),
+    [id, syncFinalState],
   );
 
   useEffect(() => {
     if (pipelineStarted.current) return;
     pipelineStarted.current = true;
-    runAndPoll({}).finally(() => setLoading(false));
-  }, [runAndPoll]);
+    runWithStream({}).finally(() => setLoading(false));
+  }, [runWithStream]);
 
   async function handleRetry() {
     setRetrying(true);
     setError(null);
-    await runAndPoll({ force: true });
+    await runWithStream({ force: true });
     setRetrying(false);
   }
 
