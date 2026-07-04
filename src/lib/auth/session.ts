@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import {
   hasMinRole,
   isAuthEnabled,
+  ACTIVE_TEAM_COOKIE,
   SESSION_COOKIE,
   type AuthContext,
   type SessionUser,
@@ -40,14 +41,20 @@ export async function getSession(): Promise<SessionUser> {
     return { enabled: true, authenticated: false };
   }
 
-  const membership = await db.teamMember.findFirst({
+  const memberships = await db.teamMember.findMany({
     where: { userId: session.userId },
     include: { team: true },
     orderBy: { createdAt: "asc" },
   });
-  if (!membership) {
+  if (memberships.length === 0) {
     return { enabled: true, authenticated: false };
   }
+
+  // 활성 팀은 쿠키에서 읽되, 반드시 사용자가 실제 멤버인 팀이어야 해요(쿠키는 신뢰 불가).
+  // 유효하지 않으면 가장 오래된 멤버십으로 폴백해요.
+  const activeTeamId = jar.get(ACTIVE_TEAM_COOKIE)?.value;
+  const active =
+    memberships.find((m) => m.teamId === activeTeamId) ?? memberships[0];
 
   return {
     enabled: true,
@@ -57,10 +64,33 @@ export async function getSession(): Promise<SessionUser> {
       email: session.user.email,
       name: session.user.name,
     },
-    teamId: membership.teamId,
-    teamName: membership.team.name,
-    role: membership.role,
+    teamId: active.teamId,
+    teamName: active.team.name,
+    role: active.role,
   };
+}
+
+/** 사용자가 속한 모든 팀 (팀 스위처용). */
+export async function listUserTeams(
+  userId: string,
+): Promise<Array<{ id: string; name: string; role: TeamRole }>> {
+  const memberships = await db.teamMember.findMany({
+    where: { userId },
+    include: { team: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return memberships.map((m) => ({ id: m.teamId, name: m.team.name, role: m.role }));
+}
+
+/** 활성 팀 전환 — 사용자가 실제 멤버인 팀만 허용해요. 유효하면 teamId 반환, 아니면 null. */
+export async function resolveSwitchableTeam(
+  userId: string,
+  teamId: string,
+): Promise<string | null> {
+  const member = await db.teamMember.findUnique({
+    where: { teamId_userId: { teamId, userId } },
+  });
+  return member ? teamId : null;
 }
 
 export async function requireAuth(minRole: TeamRole = "viewer"): Promise<AuthContext | null> {

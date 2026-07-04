@@ -5,16 +5,25 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 import { db } from "@/lib/db";
 
 let cookieToken: string | undefined;
+let activeTeamCookie: string | undefined;
 vi.mock("next/headers", () => ({
   cookies: async () => ({
-    get: (name: string) =>
-      name === "mh_session" && cookieToken ? { value: cookieToken } : undefined,
+    get: (name: string) => {
+      if (name === "mh_session" && cookieToken) return { value: cookieToken };
+      if (name === "mh_active_team" && activeTeamCookie) return { value: activeTeamCookie };
+      return undefined;
+    },
   }),
 }));
 
-const { getSession, requireAuth, assertPackTeamAccess, AuthError } = await import(
-  "./session"
-);
+const {
+  getSession,
+  requireAuth,
+  assertPackTeamAccess,
+  listUserTeams,
+  resolveSwitchableTeam,
+  AuthError,
+} = await import("./session");
 
 const RUN = `session-${Date.now()}`;
 let userId = "";
@@ -48,6 +57,7 @@ beforeEach(async () => {
   userId = user.id;
   await db.teamMember.create({ data: { teamId, userId, role: "editor" } });
   cookieToken = undefined;
+  activeTeamCookie = undefined;
 });
 
 afterEach(() => vi.unstubAllEnvs());
@@ -142,5 +152,55 @@ describe("assertPackTeamAccess", () => {
   it("AuthError 인스턴스로 던져요", async () => {
     const pack = await db.contextPack.create({ data: { issue: "남팩2", teamId: otherTeamId } });
     await expect(assertPackTeamAccess(pack.id, auth())).rejects.toBeInstanceOf(AuthError);
+  });
+});
+
+describe("멀티팀 — 활성 팀 해석 (보안 핵심)", () => {
+  async function joinOtherTeam() {
+    // 사용자를 otherTeamId에도 admin으로 가입시켜요 (멀티팀)
+    await db.teamMember.create({ data: { teamId: otherTeamId, userId, role: "admin" } });
+  }
+
+  it("활성 팀 쿠키가 없으면 가장 오래된 멤버십으로 폴백해요", async () => {
+    await joinOtherTeam();
+    cookieToken = await makeSession("editor", new Date(Date.now() + 60_000));
+    const s = await getSession();
+    if (!("authenticated" in s) || !s.authenticated) throw new Error("인증 실패");
+    expect(s.teamId).toBe(teamId); // 첫 팀
+  });
+
+  it("멤버인 팀을 가리키는 쿠키는 그 팀으로 스코프돼요", async () => {
+    await joinOtherTeam();
+    cookieToken = await makeSession("editor", new Date(Date.now() + 60_000));
+    activeTeamCookie = otherTeamId;
+    const s = await getSession();
+    if (!("authenticated" in s) || !s.authenticated) throw new Error("인증 실패");
+    expect(s.teamId).toBe(otherTeamId);
+    expect(s.role).toBe("admin"); // 그 팀에서의 역할
+  });
+
+  it("멤버가 아닌 팀을 가리키는 쿠키는 무시하고 폴백해요 (쿠키 위조 방어)", async () => {
+    // otherTeamId에 가입하지 않은 상태에서 그 팀으로 쿠키 위조
+    cookieToken = await makeSession("editor", new Date(Date.now() + 60_000));
+    activeTeamCookie = otherTeamId;
+    const s = await getSession();
+    if (!("authenticated" in s) || !s.authenticated) throw new Error("인증 실패");
+    expect(s.teamId).toBe(teamId); // 위조 무시, 실제 멤버 팀으로 폴백
+  });
+});
+
+describe("listUserTeams / resolveSwitchableTeam", () => {
+  it("사용자가 속한 모든 팀을 반환해요", async () => {
+    await db.teamMember.create({ data: { teamId: otherTeamId, userId, role: "admin" } });
+    const teams = await listUserTeams(userId);
+    expect(teams.map((t) => t.id).sort()).toEqual([teamId, otherTeamId].sort());
+  });
+
+  it("멤버인 팀은 전환 가능(teamId 반환)", async () => {
+    expect(await resolveSwitchableTeam(userId, teamId)).toBe(teamId);
+  });
+
+  it("멤버가 아닌 팀은 전환 불가(null)", async () => {
+    expect(await resolveSwitchableTeam(userId, otherTeamId)).toBeNull();
   });
 });

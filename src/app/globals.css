@@ -196,6 +196,16 @@ button {
   white-space: nowrap;
 }
 
+.header-team-switch {
+  font-size: 12.5px;
+  color: var(--fg);
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: #fff;
+  max-width: 160px;
+}
+
 .header-menu-toggle {
   display: none;
   width: 36px;

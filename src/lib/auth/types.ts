@@ -4,6 +4,8 @@ import type { TeamRole, User } from "@/generated/prisma/client";
 export type { TeamRole };
 
 export const SESSION_COOKIE = "mh_session";
+/** 활성 팀 선택을 담는 쿠키. 신뢰할 수 없는 입력이므로 세션 해석 시 멤버십을 반드시 검증해요. */
+export const ACTIVE_TEAM_COOKIE = "mh_active_team";
 const SESSION_DAYS = 14;
 
 export type AuthContext = {

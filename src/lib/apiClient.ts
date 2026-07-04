@@ -188,6 +188,7 @@ export type AuthMe =
       user: { id: string; email: string; name: string };
       team: { id: string; name: string };
       role: string;
+      teams: { id: string; name: string; role: string }[];
     };
 
 export function getMe() {
@@ -357,6 +358,14 @@ export function streamPipelineUrl(
 
 export function deleteAccount() {
   return fetch("/api/account", { method: "DELETE" }).then((r) => handle<{ ok: true }>(r));
+}
+
+export function switchTeam(teamId: string) {
+  return fetch("/api/team/switch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ teamId }),
+  }).then((r) => handle<{ ok: true; teamId: string }>(r));
 }
 
 export const accountExportUrl = "/api/account/export";

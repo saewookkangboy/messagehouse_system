@@ -232,17 +232,12 @@ export async function acceptTeamInviteForUser(input: {
     throw new InviteError("초대된 이메일과 로그인 계정이 일치하지 않아요.", 403);
   }
 
-  const existingMembership = await db.teamMember.findFirst({
-    where: { userId: user.id },
+  // 한 계정이 여러 팀에 속할 수 있어요. 같은 팀 재가입만 막아요.
+  const existingInThisTeam = await db.teamMember.findUnique({
+    where: { teamId_userId: { teamId: invite.teamId, userId: user.id } },
   });
-  if (existingMembership) {
-    if (existingMembership.teamId === invite.teamId) {
-      throw new InviteError("이미 이 팀의 멤버예요.", 409);
-    }
-    throw new InviteError(
-      "이미 다른 팀에 소속되어 있어요. 한 계정은 하나의 팀만 가입할 수 있어요.",
-      409,
-    );
+  if (existingInThisTeam) {
+    throw new InviteError("이미 이 팀의 멤버예요.", 409);
   }
 
   await db.teamMember.create({
