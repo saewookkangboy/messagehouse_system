@@ -36,6 +36,7 @@ export async function POST(request: Request) {
     res.cookies.set(ACTIVE_TEAM_COOKIE, teamId, {
       httpOnly: true,
       sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
       path: "/",
       expires: sessionExpiry(),
     });

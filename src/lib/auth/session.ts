@@ -135,7 +135,7 @@ export async function assertPackTeamAccess(
   if (!pack) {
     throw new AuthError("Context Pack을 찾지 못했어요.", 404);
   }
-  if (pack.teamId && pack.teamId !== auth.teamId) {
+  if (pack.teamId !== auth.teamId) {
     throw new AuthError("이 Context Pack에 접근할 권한이 없어요.", 403);
   }
 }

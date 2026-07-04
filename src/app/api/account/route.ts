@@ -20,7 +20,12 @@ export async function DELETE() {
     await deleteAccount(auth.user.id);
 
     const res = NextResponse.json({ ok: true });
-    res.cookies.set(SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+    res.cookies.set(SESSION_COOKIE, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 0,
+    });
     return res;
   } catch (err) {
     if (err instanceof AuthError) {

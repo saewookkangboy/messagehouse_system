@@ -1,5 +1,13 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { purgeExpiredSourceFiles, DEFAULT_RETENTION_DAYS } from "@/lib/retention";
+
+function secretsMatch(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
 
 /**
  * 보존 기간 지난 업로드 원본 파일 정리 — 외부 스케줄러(GitHub Actions cron)가 호출해요.
@@ -15,7 +23,7 @@ export async function POST(request: Request) {
     );
   }
   const provided = request.headers.get("x-maintenance-secret");
-  if (provided !== secret) {
+  if (!provided || !secretsMatch(provided, secret)) {
     return NextResponse.json({ error: "인가되지 않은 요청이에요." }, { status: 401 });
   }
 

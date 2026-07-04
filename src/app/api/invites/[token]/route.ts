@@ -62,6 +62,7 @@ export async function POST(request: Request, { params }: Params) {
     response.cookies.set(SESSION_COOKIE, result.sessionToken, {
       httpOnly: true,
       sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
       path: "/",
       expires: sessionExpiry(),
     });

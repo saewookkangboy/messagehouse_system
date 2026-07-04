@@ -10,16 +10,33 @@ import {
 } from "@/lib/contextPackSerialization";
 import { buildRagContextForAnalysis, retrieveRelevantChunks } from "@/lib/rag";
 import { decryptField } from "@/lib/fieldCrypto";
+import { checkRateLimit } from "@/lib/rateLimit";
 import type {
   AnalyzeStepResult,
   GenerateStepResult,
   PackWithFiles,
+  PipelineStep,
   ResearchStepResult,
 } from "./schema";
 import { PipelineError } from "./schema";
 
 function isRecordNotFoundError(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025";
+}
+
+/** AI/리서치 프로바이더 호출 비용 남용 방지 — 팀당 10분에 30회. */
+async function assertPipelineRateLimit(pack: PackWithFiles, step: PipelineStep): Promise<void> {
+  const { allowed } = await checkRateLimit(`pipeline:${step}:${pack.teamId}`, {
+    limit: 30,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (!allowed) {
+    throw new PipelineError(
+      "요청이 너무 많아요. 잠시 후 다시 시도해주세요.",
+      step,
+      429,
+    );
+  }
 }
 
 async function loadPack(packId: string): Promise<PackWithFiles> {
@@ -38,6 +55,7 @@ export async function runAnalyzeStep(packId: string): Promise<AnalyzeStepResult>
   if (pack.files.length === 0) {
     throw new PipelineError("먼저 파일을 업로드해주세요.", "analyze");
   }
+  await assertPipelineRateLimit(pack, "analyze");
 
   const provider = getAiProvider();
   const pending = pack.files.filter((f) => !f.analyzedAt);
@@ -100,6 +118,7 @@ export async function runResearchStep(packId: string): Promise<ResearchStepResul
   if (pack.files.length === 0 || unanalyzed.length > 0) {
     throw new PipelineError("먼저 파일 분석을 완료해주세요.", "research");
   }
+  await assertPipelineRateLimit(pack, "research");
 
   const provider = getResearchProvider();
   const result = await provider.research({
@@ -140,6 +159,7 @@ export async function runGenerateStep(packId: string): Promise<GenerateStepResul
       "generate",
     );
   }
+  await assertPipelineRateLimit(pack, "generate");
 
   const provider = getAiProvider();
   const research = deserializeResearchResult(pack.researchResult);
