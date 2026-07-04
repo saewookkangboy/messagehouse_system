@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/Header";
+import { Stepper } from "@/components/Stepper";
 import { getContextPack, patchContextPack, type ContextPack } from "@/lib/apiClient";
 import {
   deserializePillars,
@@ -137,6 +138,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   return (
     <>
       <Header subtitle="Human-in-the-Loop · F-05" />
+      <Stepper current="review" />
       <main className="page" id="main-content">
         <div className="eyebrow">Human-in-the-Loop · F-05</div>
         <h1 className="page-title">검토 · 수정</h1>

@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
+import { Stepper } from "@/components/Stepper";
 import {
   analyzeContextPack,
   createContextPack,
@@ -106,6 +107,7 @@ export default function NewContextPackPage() {
   return (
     <>
       <Header subtitle="Step 1 · 파일 업로드" />
+      <Stepper current="upload" />
       <main className="page" id="main-content">
         <div className="eyebrow">Step 1</div>
         <h1 className="page-title">파일을 업로드하세요</h1>

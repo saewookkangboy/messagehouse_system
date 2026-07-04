@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { Header } from "@/components/Header";
+import { Stepper } from "@/components/Stepper";
 import {
   exportToDestination,
   getContextPack,
@@ -85,6 +86,7 @@ export default function ExportPage({ params }: { params: Promise<{ id: string }>
   return (
     <>
       <Header subtitle="Export" />
+      <Stepper current="export" />
       <main className="page" id="main-content">
         <div className="eyebrow">Export</div>
         <h1 className="page-title">Context Pack 보내기</h1>

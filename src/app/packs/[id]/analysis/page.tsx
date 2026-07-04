@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
+import { Stepper } from "@/components/Stepper";
 import {
   generateContextPack,
   getPipelineStatus,
@@ -178,6 +179,7 @@ export default function AnalysisPage({
   return (
     <>
       <Header subtitle="Step 2 · 파일 분석 결과" />
+      <Stepper current="analysis" />
       <main className="page" id="main-content">
         <div className="eyebrow">Step 2 결과 · F-02</div>
         <h1 className="page-title">파일 분석 요약 카드</h1>

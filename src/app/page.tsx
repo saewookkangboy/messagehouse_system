@@ -72,7 +72,15 @@ export default function HomePage() {
                 <tbody>
                   {packs.map((p) => (
                     <tr key={p.id}>
-                      <td>{p.issue}</td>
+                      <td>
+                        {p.issue === "제목 없는 이슈" ? (
+                          <span style={{ color: "var(--muted-2)", fontStyle: "italic" }}>
+                            제목 없는 이슈
+                          </span>
+                        ) : (
+                          p.issue
+                        )}
+                      </td>
                       <td>{p.industry ?? "—"}</td>
                       <td className="tnum">v{p.version}</td>
                       <td>
