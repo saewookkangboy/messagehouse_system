@@ -1,3 +1,4 @@
+import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { getAiProvider, AiResponseParseError } from "@/lib/ai";
 import { getResearchProvider } from "@/lib/research";
@@ -16,6 +17,10 @@ import type {
   ResearchStepResult,
 } from "./schema";
 import { PipelineError } from "./schema";
+
+function isRecordNotFoundError(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025";
+}
 
 async function loadPack(packId: string): Promise<PackWithFiles> {
   const pack = await db.contextPack.findUnique({
@@ -103,14 +108,22 @@ export async function runResearchStep(packId: string): Promise<ResearchStepResul
     topics: pack.files.map((f) => f.topic).filter((t): t is string => Boolean(t)),
   });
 
-  const contextPack = await db.contextPack.update({
-    where: { id: packId },
-    data: {
-      researchResult: serializeResearchResult(result),
-      researchedAt: new Date(),
-      researchStatus: "completed",
-    },
-  });
+  let contextPack;
+  try {
+    contextPack = await db.contextPack.update({
+      where: { id: packId },
+      data: {
+        researchResult: serializeResearchResult(result),
+        researchedAt: new Date(),
+        researchStatus: "completed",
+      },
+    });
+  } catch (err) {
+    if (isRecordNotFoundError(err)) {
+      throw new PipelineError("Context Pack이 조사 중 삭제되었어요.", "research", 404);
+    }
+    throw err;
+  }
 
   return { contextPack, research: result };
 }
@@ -181,6 +194,9 @@ export async function runGenerateStep(packId: string): Promise<GenerateStepResul
 
     return { contextPack };
   } catch (err) {
+    if (isRecordNotFoundError(err)) {
+      throw new PipelineError("Context Pack이 생성 중 삭제되었어요.", "generate", 404);
+    }
     const message =
       err instanceof AiResponseParseError
         ? err.message
