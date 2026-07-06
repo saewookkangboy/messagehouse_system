@@ -20,12 +20,12 @@ export default defineConfig({
   retries: 1,
   use: {
     ...devices["Desktop Chrome"],
-    baseURL: "http://127.0.0.1:3099",
+    baseURL: "http://localhost:3099",
     trace: "on-first-retry",
   },
   webServer: {
     command: "npx prisma migrate deploy && npm run dev -- --port 3099",
-    url: "http://127.0.0.1:3099",
+    url: "http://localhost:3099",
     reuseExistingServer: false,
     timeout: 120_000,
     env: e2eEnv,
