@@ -1,15 +1,16 @@
 import { Fragment } from "react";
 
-export type StepKey = "upload" | "analysis" | "review" | "export";
+export type StepKey = "intake" | "upload" | "analysis" | "review" | "export";
 
 const STEPS: { key: StepKey; label: string }[] = [
+  { key: "intake", label: "기본 정보" },
   { key: "upload", label: "업로드" },
   { key: "analysis", label: "분석" },
   { key: "review", label: "검토" },
-  { key: "export", label: "내보내기" },
+  { key: "export", label: "보내기" },
 ];
 
-/** 전체 4단계 흐름에서 현재 위치를 보여주는 스테퍼. */
+/** 전체 5단계 흐름에서 현재 위치를 보여주는 스테퍼. */
 export function Stepper({ current }: { current: StepKey }) {
   const currentIdx = STEPS.findIndex((s) => s.key === current);
 

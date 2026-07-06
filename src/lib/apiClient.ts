@@ -16,7 +16,12 @@ export function listContextPacks() {
   );
 }
 
-export function createContextPack(input?: { issue?: string; industry?: string }) {
+export function createContextPack(input?: {
+  issue?: string;
+  industry?: string;
+  purpose?: string;
+  targetAudience?: string;
+}) {
   return fetch("/api/context-packs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -44,9 +49,20 @@ export function uploadFiles(id: string, files: File[]) {
   return fetch(`/api/context-packs/${id}/files`, {
     method: "POST",
     body: formData,
-  }).then((r) =>
-    handle<{ files: SourceFile[]; errors: { filename: string; message: string }[] }>(r),
-  );
+  }).then(async (r) => {
+    const body = (await r.json().catch(() => ({}))) as {
+      files?: SourceFile[];
+      errors?: { filename: string; message: string }[];
+      error?: string;
+    };
+    if (!r.ok) {
+      const details = body.errors?.length
+        ? body.errors.map((e) => `${e.filename}: ${e.message}`).join(", ")
+        : body.error;
+      throw new Error(details ?? `요청이 실패했어요 (${r.status})`);
+    }
+    return body as { files: SourceFile[]; errors: { filename: string; message: string }[] };
+  });
 }
 
 export function deleteFile(id: string, fileId: string) {

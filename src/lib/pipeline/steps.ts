@@ -8,9 +8,22 @@ import {
   serializeResearchResult,
   serializeStringList,
 } from "@/lib/contextPackSerialization";
-import { buildRagContextForAnalysis, retrieveRelevantChunks } from "@/lib/rag";
+import { buildRagContextForAnalysis, indexSourceFile, retrieveRelevantChunks } from "@/lib/rag";
 import { decryptField } from "@/lib/fieldCrypto";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { joinFoundations, splitFoundation } from "@/lib/foundation";
+import type { MessageHouse } from "@/lib/ai/schema";
+import {
+  appendValidationRiskFlags,
+  formatValidationErrors,
+  hasHardValidationFailure,
+  validateMessageHouseContext,
+} from "@/lib/ai/validateMessageHouse";
+import {
+  refineMessageHousePillars,
+  validatePillarMessages,
+} from "@/lib/pillarMessage";
+import { refineNaturalMessageHouse } from "@/lib/messageHouseSentence";
 import type {
   AnalyzeStepResult,
   GenerateStepResult,
@@ -64,6 +77,10 @@ export async function runAnalyzeStep(packId: string): Promise<AnalyzeStepResult>
 
   for (const file of pending) {
     try {
+      const chunkCount = await db.documentChunk.count({ where: { sourceFileId: file.id } });
+      if (chunkCount === 0) {
+        await indexSourceFile(file.id);
+      }
       const rag = await buildRagContextForAnalysis({
         sourceFileId: file.id,
         text: decryptField(file.extractedText),
@@ -147,6 +164,70 @@ export async function runResearchStep(packId: string): Promise<ResearchStepResul
   return { contextPack, research: result };
 }
 
+function normalizeMessageHouse(
+  result: MessageHouse,
+  issue = "",
+  industry?: string | null,
+): MessageHouse {
+  const legacyParts = splitFoundation(result.foundation);
+  const pillars = result.pillars.map((pillar, i) => ({
+    ...pillar,
+    foundation: pillar.foundation?.trim() || legacyParts[i] || "",
+  }));
+
+  const normalized = {
+    ...result,
+    pillars,
+    foundation: joinFoundations(pillars.map((pillar) => pillar.foundation)),
+  };
+
+  return refineNaturalMessageHouse(normalized, issue, industry);
+}
+
+function validateGeneratedMessageHouse(
+  result: MessageHouse,
+  pack: Pick<PackWithFiles, "issue" | "industry" | "files">,
+): MessageHouse {
+  const analyses = pack.files.map((f) => ({
+    filename: f.filename,
+    analysis: {
+      docType: f.docType ?? "",
+      topic: f.topic ?? "",
+      claim: f.claim ?? "",
+      numbers: f.numbers ?? "",
+      terms: f.terms ?? "",
+      audience: f.audience ?? "",
+      risk: f.risk ?? "",
+    },
+  }));
+
+  const issues = validateMessageHouseContext(result, {
+    issue: pack.issue,
+    industry: pack.industry,
+    analyses,
+  });
+
+  if (hasHardValidationFailure(issues)) {
+    throw new PipelineError(
+      `메시지하우스 맥락 검수에 실패했어요. ${formatValidationErrors(issues)}`,
+      "generate",
+      502,
+    );
+  }
+
+  const pillarIssues = validatePillarMessages(result, pack.issue);
+  const withPillarFlags = appendValidationRiskFlags(
+    result,
+    pillarIssues.map((issue) => ({
+      code: "ungrounded_pillar" as const,
+      pillarId: issue.pillarId,
+      message: issue.message,
+    })),
+  );
+
+  return appendValidationRiskFlags(withPillarFlags, issues);
+}
+
 export async function runGenerateStep(packId: string): Promise<GenerateStepResult> {
   const pack = await loadPack(packId);
   if (pack.files.length === 0) {
@@ -163,7 +244,13 @@ export async function runGenerateStep(packId: string): Promise<GenerateStepResul
 
   const provider = getAiProvider();
   const research = deserializeResearchResult(pack.researchResult);
-  const ragQuery = [pack.issue, pack.industry, ...pack.files.map((f) => f.topic ?? "")]
+  const ragQuery = [
+    pack.issue,
+    pack.industry,
+    pack.purpose,
+    pack.targetAudience,
+    ...pack.files.map((f) => f.topic ?? ""),
+  ]
     .filter(Boolean)
     .join(" ");
   const ragChunks = await retrieveRelevantChunks({
@@ -173,9 +260,13 @@ export async function runGenerateStep(packId: string): Promise<GenerateStepResul
   });
 
   try {
-    const result = await provider.generateMessageHouse({
+    const result = validateGeneratedMessageHouse(
+      normalizeMessageHouse(
+        await provider.generateMessageHouse({
       issue: pack.issue,
       industry: pack.industry,
+      purpose: pack.purpose,
+      targetAudience: pack.targetAudience,
       analyses: pack.files.map((f) => ({
         filename: f.filename,
         analysis: {
@@ -190,7 +281,12 @@ export async function runGenerateStep(packId: string): Promise<GenerateStepResul
       })),
       research,
       ragChunks,
-    });
+        }),
+        pack.issue,
+        pack.industry,
+      ),
+      pack,
+    );
 
     const contextPack = await db.contextPack.update({
       where: { id: packId },

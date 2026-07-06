@@ -34,11 +34,19 @@ export async function POST(request: Request) {
     const issue = typeof body.issue === "string" && body.issue.trim() ? body.issue.trim() : undefined;
     const industry =
       typeof body.industry === "string" && body.industry.trim() ? body.industry.trim() : undefined;
+    const purpose =
+      typeof body.purpose === "string" && body.purpose.trim() ? body.purpose.trim() : undefined;
+    const targetAudience =
+      typeof body.targetAudience === "string" && body.targetAudience.trim()
+        ? body.targetAudience.trim()
+        : undefined;
 
     const pack = await db.contextPack.create({
       data: {
         issue,
         industry,
+        purpose,
+        targetAudience,
         teamId: auth?.teamId,
         createdById: auth?.user.id,
       },

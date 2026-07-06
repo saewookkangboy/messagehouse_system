@@ -18,6 +18,7 @@ export const PillarSchema = z.object({
   theme: z.string().min(1),
   message: z.string().min(1),
   evidence: z.string().min(1),
+  foundation: z.string().default(""),
   source: z.enum(["file_extracted", "research_enhanced"]),
 });
 export type Pillar = z.infer<typeof PillarSchema>;
@@ -64,6 +65,8 @@ export interface AiProvider {
   generateMessageHouse(input: {
     issue: string;
     industry?: string | null;
+    purpose?: string | null;
+    targetAudience?: string | null;
     analyses: Array<{ filename: string; analysis: DocumentAnalysis }>;
     research?: ResearchResult | null;
     ragChunks?: RetrievedChunk[];

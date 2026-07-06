@@ -17,6 +17,8 @@ export type MessageHouseFieldKey = (typeof MESSAGE_HOUSE_FIELD_KEYS)[number];
 export type ContextPackPatchBody = {
   issue?: string;
   industry?: string | null;
+  purpose?: string | null;
+  targetAudience?: string | null;
   roofMessage?: string;
   pillars?: unknown;
   foundation?: string;
@@ -131,6 +133,8 @@ export function buildContextPackPatchData(input: {
 
   if (body.issue !== undefined) data.issue = body.issue;
   if (body.industry !== undefined) data.industry = body.industry;
+  if (body.purpose !== undefined) data.purpose = body.purpose;
+  if (body.targetAudience !== undefined) data.targetAudience = body.targetAudience;
   if (body.roofMessage !== undefined) data.roofMessage = body.roofMessage;
   if (serialized.pillars !== undefined) data.pillars = serialized.pillars;
   if (body.foundation !== undefined) data.foundation = body.foundation;

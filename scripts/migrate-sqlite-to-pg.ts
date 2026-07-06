@@ -142,6 +142,8 @@ async function main(): Promise<void> {
         "id",
         "issue",
         "industry",
+        "purpose",
+        "targetAudience",
         "status",
         "version",
         "teamId",

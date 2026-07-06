@@ -46,6 +46,8 @@ export async function GET(_request: Request, { params }: Params) {
 const PatchBodySchema = z.object({
   issue: z.string().min(1).optional(),
   industry: z.string().nullable().optional(),
+  purpose: z.string().nullable().optional(),
+  targetAudience: z.string().nullable().optional(),
   roofMessage: z.string().optional(),
   pillars: z.array(PillarSchema).optional(),
   foundation: z.string().optional(),

@@ -88,9 +88,11 @@ model Session {
 
 model ContextPack {
   id       String            @id @default(cuid())
-  issue    String            @default("제목 없는 이슈")
-  industry String?
-  status   ContextPackStatus @default(draft)
+  issue           String            @default("제목 없는 이슈")
+  industry        String?
+  purpose         String?
+  targetAudience  String?
+  status          ContextPackStatus @default(draft)
   version  String            @default("0.1")
 
   teamId      String?

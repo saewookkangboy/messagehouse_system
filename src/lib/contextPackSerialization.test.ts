@@ -12,8 +12,22 @@ import type { Pillar } from "./ai/schema";
 import type { ResearchResult } from "./research/schema";
 
 const pillars: Pillar[] = [
-  { id: "P1", theme: "A", message: "msg-a", evidence: "ev-a", source: "file_extracted" },
-  { id: "P2", theme: "B", message: "msg-b", evidence: "ev-b", source: "research_enhanced" },
+  {
+    id: "P1",
+    theme: "A",
+    message: "msg-a",
+    evidence: "ev-a",
+    foundation: "",
+    source: "file_extracted",
+  },
+  {
+    id: "P2",
+    theme: "B",
+    message: "msg-b",
+    evidence: "ev-b",
+    foundation: "",
+    source: "research_enhanced",
+  },
 ];
 
 describe("pillar serialization", () => {

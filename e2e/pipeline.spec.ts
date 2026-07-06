@@ -5,19 +5,25 @@ test.describe("Context Pack 파이프라인 E2E", () => {
   test("업로드 → 분석 → 리서치 → 생성 → 확정 →보내기", async ({ page }) => {
     await page.goto("/packs/new");
 
-    await page.getByLabel("이슈명").fill("E2E 테스트 이슈");
-    await page.getByLabel("업종").fill("보험");
+    await page.getByLabel("메시지하우스 주제").fill("E2E 테스트 이슈");
+    await page.getByLabel("카테고리(도메인)").fill("보험");
+    await page.getByLabel("메시지하우스 활용 목적").fill("보도자료 작성");
+    await page.getByLabel("타겟 오디언스").fill("언론");
 
-    const demoFile = path.join(__dirname, "fixtures", "demo.txt");
     const createPromise = page.waitForResponse(
       (r) => r.url().includes("/api/context-packs") && r.request().method() === "POST",
     );
+    await page.getByRole("button", { name: "다음: 파일 업로드" }).click();
+    const createRes = await createPromise;
+    expect(createRes.ok()).toBeTruthy();
+    await expect(page).toHaveURL(/\/upload/, { timeout: 15_000 });
+
+    const demoFile = path.join(__dirname, "fixtures", "demo.txt");
     const uploadPromise = page.waitForResponse(
       (r) => r.url().includes("/files") && r.request().method() === "POST",
     );
     await page.locator('input[type="file"]').setInputFiles(demoFile);
-    const [createRes, uploadRes] = await Promise.all([createPromise, uploadPromise]);
-    expect(createRes.ok()).toBeTruthy();
+    const uploadRes = await uploadPromise;
     expect(uploadRes.ok()).toBeTruthy();
 
     await expect(page.locator(".fileitem .fname", { hasText: "demo.txt" })).toBeVisible();

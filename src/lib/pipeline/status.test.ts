@@ -7,6 +7,8 @@ function pack(overrides: Partial<PackWithFiles> = {}): PackWithFiles {
     id: "pack-1",
     issue: "테스트 이슈",
     industry: null,
+    purpose: null,
+    targetAudience: null,
     status: "draft",
     version: "0.1",
     teamId: null,

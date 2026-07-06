@@ -7,7 +7,6 @@ import {
   EmptyDocumentError,
   UnsupportedFileTypeError,
 } from "@/lib/fileParsing";
-import { indexSourceFile } from "@/lib/rag";
 import { encryptField } from "@/lib/fieldCrypto";
 import { authErrorResponse, authorizePack } from "@/lib/auth/api";
 
@@ -79,12 +78,7 @@ export async function POST(request: Request, { params }: Params) {
           extractedText: encryptField(text),
         },
       });
-      try {
-        await indexSourceFile(record.id);
-      } catch (indexErr) {
-        await db.sourceFile.delete({ where: { id: record.id } });
-        throw indexErr;
-      }
+      // ponytail: RAG 인덱싱은 analyze 단계에서 — 업로드 응답을 HF cold start(60s+)에 묶지 않음
       created.push(record);
       fileCount += 1;
       totalBytes += file.size;

@@ -10,20 +10,26 @@ async function main() {
 
   await page.goto(`${BASE}/packs/new`);
 
-  await page.waitForSelector("#issue", { timeout: 30_000 });
-  await page.locator("#issue").fill("AI 언더라이팅 신상품 출시");
-  await page.locator("#industry").fill("보험");
+  await page.waitForSelector("#topic", { timeout: 30_000 });
+  await page.locator("#topic").fill("AI 언더라이팅 신상품 출시");
+  await page.locator("#domain").fill("보험");
+  await page.locator("#purpose").fill("신제품 보도자료");
+  await page.locator("#targetAudience").fill("일반 소비자, 언론");
 
-  const demoFile = path.join(__dirname, "..", "e2e", "fixtures", "demo.txt");
   const createPromise = page.waitForResponse(
     (r) => r.url().includes("/api/context-packs") && r.request().method() === "POST",
   );
+  await page.getByRole("button", { name: "다음: 파일 업로드" }).click();
+  const createRes = await createPromise;
+  if (!createRes.ok()) throw new Error(`Pack create failed: ${createRes.status()}`);
+  await page.waitForURL(/\/upload/, { timeout: 15_000 });
+
+  const demoFile = path.join(__dirname, "..", "e2e", "fixtures", "demo.txt");
   const uploadPromise = page.waitForResponse(
     (r) => r.url().includes("/files") && r.request().method() === "POST",
   );
   await page.locator('input[type="file"]').setInputFiles(demoFile);
-  const [createRes, uploadRes] = await Promise.all([createPromise, uploadPromise]);
-  if (!createRes.ok()) throw new Error(`Pack create failed: ${createRes.status()}`);
+  const uploadRes = await uploadPromise;
   if (!uploadRes.ok()) throw new Error(`Upload failed: ${uploadRes.status()}`);
 
   await page.locator(".fileitem .fname", { hasText: "demo.txt" }).waitFor({ timeout: 15_000 });

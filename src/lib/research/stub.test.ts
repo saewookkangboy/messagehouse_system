@@ -13,14 +13,14 @@ describe("StubResearchProvider", () => {
     expect(() => ResearchResultSchema.parse(result)).not.toThrow();
   });
 
-  it("mentions the given industry in industry trends when provided", async () => {
+  it("mentions the given issue in differentiation point", async () => {
     const provider = new StubResearchProvider();
     const result = await provider.research({
-      issue: "AI 언더라이팅 신상품 출시",
-      industry: "보험",
+      issue: "메리츠화재 ESG",
+      industry: "손해보험",
       topics: [],
     });
-    expect(result.industryTrends.join(" ")).toContain("보험");
+    expect(result.differentiationPoint).toContain("메리츠화재 ESG");
   });
 
   it("works without an industry", async () => {

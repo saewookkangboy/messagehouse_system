@@ -5,11 +5,19 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Stepper } from "@/components/Stepper";
-import { getContextPack, patchContextPack, type ContextPack } from "@/lib/apiClient";
+import { getContextPack, patchContextPack, type ContextPack, type SourceFile } from "@/lib/apiClient";
 import {
   deserializePillars,
   deserializeStringList,
+  deserializeResearchResult,
 } from "@/lib/contextPackSerialization";
+import { deriveFoundationItems, joinFoundations, splitFoundation, FOUNDATION_ITEM_LABELS } from "@/lib/foundation";
+import {
+  composeFoundationSentence,
+  refineNaturalMessageHouse,
+} from "@/lib/messageHouseSentence";
+import type { MessageHouse } from "@/lib/ai/schema";
+import type { ResearchResult } from "@/lib/research/schema";
 import type { Pillar } from "@/lib/ai/schema";
 
 export default function ReviewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -17,6 +25,8 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   const router = useRouter();
 
   const [pack, setPack] = useState<ContextPack | null>(null);
+  const [files, setFiles] = useState<SourceFile[]>([]);
+  const [research, setResearch] = useState<ResearchResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -24,7 +34,6 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
 
   const [roofMessage, setRoofMessage] = useState("");
   const [pillars, setPillars] = useState<Pillar[]>([]);
-  const [foundation, setFoundation] = useState("");
   const [objectionsText, setObjectionsText] = useState("");
   const [aieoSummary, setAieoSummary] = useState("");
   const [riskFlagsText, setRiskFlagsText] = useState("");
@@ -40,12 +49,33 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
       .then((res) => {
         const p = res.contextPack;
         setPack(p);
-        setRoofMessage(p.roofMessage ?? "");
-        setPillars(deserializePillars(p.pillars));
-        setFoundation(p.foundation ?? "");
-        setObjectionsText(deserializeStringList(p.objections).join("\n"));
-        setAieoSummary(p.aieoSummary ?? "");
-        setRiskFlagsText(deserializeStringList(p.riskFlags).join("\n"));
+        setFiles(p.files ?? []);
+        setResearch(deserializeResearchResult(p.researchResult));
+        const loadedPillars = deserializePillars(p.pillars);
+        const legacyParts = splitFoundation(p.foundation ?? "");
+        const pillarsWithFoundation = loadedPillars.map((pillar, i) => ({
+          ...pillar,
+          foundation: pillar.foundation?.trim() || legacyParts[i] || "",
+        }));
+        const natural = refineNaturalMessageHouse(
+          {
+            roofMessage: p.roofMessage ?? "",
+            pillars: pillarsWithFoundation,
+            foundation: p.foundation ?? "",
+            objections: deserializeStringList(p.objections),
+            aieoSummary: p.aieoSummary ?? "",
+            riskFlags: deserializeStringList(p.riskFlags),
+            forbiddenTerms: p.forbiddenTerms ?? "",
+            officialTerms: p.officialTerms ?? "",
+          },
+          p.issue ?? "",
+          p.industry,
+        );
+        setRoofMessage(natural.roofMessage);
+        setPillars(natural.pillars);
+        setObjectionsText(natural.objections.join("\n"));
+        setAieoSummary(natural.aieoSummary);
+        setRiskFlagsText(natural.riskFlags.join("\n"));
         setForbiddenTerms(p.forbiddenTerms ?? "");
         setOfficialTerms(p.officialTerms ?? "");
         setGate1(p.gateMessageReviewed);
@@ -56,21 +86,35 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
       .finally(() => setLoading(false));
   }, [id]);
 
-  function updatePillar(index: number, message: string) {
-    setPillars((prev) => prev.map((p, i) => (i === index ? { ...p, message } : p)));
+  function buildNaturalHouse(): MessageHouse {
+    return refineNaturalMessageHouse(
+      {
+        roofMessage,
+        pillars,
+        foundation: joinFoundations(pillars.map((p) => p.foundation)),
+        objections: objectionsText.split("\n").map((s) => s.trim()).filter(Boolean),
+        aieoSummary,
+        riskFlags: riskFlagsText.split("\n").map((s) => s.trim()).filter(Boolean),
+        forbiddenTerms,
+        officialTerms,
+      },
+      pack?.issue ?? "",
+      pack?.industry,
+    );
   }
 
   async function handleSave() {
     setSaving(true);
     setError(null);
     try {
+      const natural = buildNaturalHouse();
       const res = await patchContextPack(id, {
-        roofMessage,
-        pillars,
-        foundation,
-        objections: objectionsText.split("\n").map((s) => s.trim()).filter(Boolean),
-        aieoSummary,
-        riskFlags: riskFlagsText.split("\n").map((s) => s.trim()).filter(Boolean),
+        roofMessage: natural.roofMessage,
+        pillars: natural.pillars,
+        foundation: natural.foundation,
+        objections: natural.objections,
+        aieoSummary: natural.aieoSummary,
+        riskFlags: natural.riskFlags,
         forbiddenTerms,
         officialTerms,
       });
@@ -161,35 +205,43 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
             />
           </div>
 
-          <div className="pillars">
+          <div className="pillar-columns">
             {pillars.map((p, i) => (
-              <div className={`pillar${p.source === "research_enhanced" ? " enhanced" : ""}`} key={p.id}>
-                <div className="ptheme">
-                  기둥 {i + 1} · {p.theme}
+              <div className="pillar-column" key={p.id}>
+                <div className={`pillar${p.source === "research_enhanced" ? " enhanced" : ""}`}>
+                  <div className="ptheme">
+                    기둥 {i + 1} · {p.theme}
+                  </div>
+                  <p className="pmsg pillar-message">{p.message}</p>
+                  <div className="pev">근거: {p.evidence}</div>
+                  <span className={`tag${p.source === "research_enhanced" ? " tag-dark" : ""}`}>
+                    {p.source === "research_enhanced" ? "리서치 보강" : "파일 추출"}
+                  </span>
                 </div>
-                <textarea
-                  className="edit-input"
-                  rows={3}
-                  value={p.message}
-                  onChange={(e) => updatePillar(i, e.target.value)}
-                />
-                <div className="pev">근거: {p.evidence}</div>
-                <span className={`tag${p.source === "research_enhanced" ? " tag-dark" : ""}`}>
-                  {p.source === "research_enhanced" ? "리서치 보강" : "파일 추출"}
-                </span>
+                <div className="foundation">
+                  <div className="foundation-head">
+                    <b>기반 (Foundation)</b>
+                    <span>근거·수치·사례</span>
+                  </div>
+                  <ul className="foundation-list" aria-label={`기둥 ${i + 1} 기반 자료`}>
+                    {deriveFoundationItems(p, i, files, research).map((item, j) => (
+                      <li key={FOUNDATION_ITEM_LABELS[j]}>
+                        <span className="foundation-label">{FOUNDATION_ITEM_LABELS[j]}</span>
+                        <p
+                          className={`foundation-item${FOUNDATION_ITEM_LABELS[j] === "수치" ? " mono tnum" : ""}${item === "원본 자료에서 확인되지 않았어요" ? " muted" : ""}`}
+                        >
+                          {composeFoundationSentence(
+                            FOUNDATION_ITEM_LABELS[j],
+                            item,
+                            pack?.issue ?? "",
+                          )}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             ))}
-          </div>
-
-          <div className="foundation">
-            <b>기반 (Foundation)</b> — 근거·수치·사례
-            <textarea
-              className="edit-input"
-              rows={2}
-              style={{ marginTop: 6 }}
-              value={foundation}
-              onChange={(e) => setFoundation(e.target.value)}
-            />
           </div>
 
           <div className="side2">
@@ -198,7 +250,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
                 <svg className="icon" aria-hidden="true" viewBox="0 0 24 24">
                   <path d="M12 3l7 3v6c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V6l7-3z" />
                 </svg>
-                빈 탄 (Objection) — 오해 방지 문장 (줄바꿈으로 구분)
+                오해 방지 문장
               </div>
               <textarea
                 className="edit-input"
