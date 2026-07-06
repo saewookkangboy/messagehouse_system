@@ -128,7 +128,10 @@ export function googleOAuthUrl(state: string, redirectUri: string): string {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/drive.file",
+    // drive.file: 앱이 만든 파일(export용) · drive.readonly: 사용자 파일 읽기(import용)
+    // drive.readonly는 Google 제한 스코프라 프로덕션 배포 시 앱 검증이 필요해요.
+    scope:
+      "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly",
     access_type: "offline",
     prompt: "consent",
     state,

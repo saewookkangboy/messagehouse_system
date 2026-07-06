@@ -50,11 +50,11 @@ PRD v0.2의 핵심 파이프라인(파일 업로드 → RAG 분석 → 메시지
 
 ### 알려진 후속 과제
 
-- 외부 연동은 **export 전용** (Notion/Drive에서 import·검색 미지원)
 - 레이트리밋은 in-memory 기본 — 다중 인스턴스 배포 시 `setRateLimitStore()`로 공유 스토어(Redis) 주입 필요
 
 ### 구현된 보안·데이터 라이프사이클
 
+- **외부 문서 가져오기** — 연동된 Notion·Google Drive에서 문서를 조직 라이브러리로 가져와 RAG 인덱싱해요 (`/org-documents` 페이지). Notion은 연동 시 공유된 페이지를 읽고, Google Drive는 `drive.readonly` 스코프가 필요해요(프로덕션은 Google 앱 검증 대상).
 - 상태 변경 API는 Origin/Referer 검증(CSRF 방어). 로그인·가입·초대는 레이트 리미팅.
 - **문서 본문 at-rest 암호화** — 추출 텍스트·RAG 청크(3개 컬럼)를 AES-256-GCM으로 저장. 레거시 평문은 자동 통과. `DOCUMENT_ENCRYPTION_KEY` 프로덕션 필수.
 - **30일 자동 삭제** — `/api/maintenance/purge`(시크릿 보호) + GitHub Actions cron으로 보존 기간 지난 업로드 원본 삭제. `FILE_RETENTION_DAYS`로 조정.

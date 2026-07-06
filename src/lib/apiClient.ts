@@ -259,6 +259,25 @@ export function deleteOrgDocument(id: string) {
   );
 }
 
+export type ImportableDoc = { externalId: string; title: string };
+
+export function listImportableDocuments(provider: "notion" | "google") {
+  return fetch(`/api/integrations/${provider}/documents`).then((r) =>
+    handle<{ documents: ImportableDoc[] }>(r),
+  );
+}
+
+export function importIntegrationDocument(
+  provider: "notion" | "google",
+  input: { externalId: string; title: string },
+) {
+  return fetch(`/api/integrations/${provider}/import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  }).then((r) => handle<{ document: { id: string; title: string } }>(r));
+}
+
 export type TeamMemberRow = {
   userId: string;
   role: string;

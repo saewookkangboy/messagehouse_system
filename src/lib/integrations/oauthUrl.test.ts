@@ -29,7 +29,7 @@ describe("notionOAuthUrl", () => {
 });
 
 describe("googleOAuthUrl", () => {
-  it("drive.file 스코프와 offline access를 요청해요", () => {
+  it("export용 drive.file + import용 drive.readonly 스코프와 offline access를 요청해요", () => {
     vi.stubEnv("GOOGLE_CLIENT_ID", "google-client-456");
     const url = new URL(
       googleOAuthUrl("state-abc", "https://app.example.com/api/integrations/google/callback"),
@@ -37,7 +37,9 @@ describe("googleOAuthUrl", () => {
     expect(url.origin + url.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
     expect(url.searchParams.get("client_id")).toBe("google-client-456");
     expect(url.searchParams.get("state")).toBe("state-abc");
-    expect(url.searchParams.get("scope")).toBe("https://www.googleapis.com/auth/drive.file");
+    const scope = url.searchParams.get("scope") ?? "";
+    expect(scope).toContain("https://www.googleapis.com/auth/drive.file");
+    expect(scope).toContain("https://www.googleapis.com/auth/drive.readonly");
     expect(url.searchParams.get("access_type")).toBe("offline");
   });
 

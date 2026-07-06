@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
-import { listOrgDocuments, uploadOrgDocument } from "@/lib/apiClient";
+import {
+  importIntegrationDocument,
+  listImportableDocuments,
+  listOrgDocuments,
+  uploadOrgDocument,
+  type ImportableDoc,
+} from "@/lib/apiClient";
 
 type DocRow = {
   id: string;
@@ -14,6 +20,8 @@ type DocRow = {
   uploadedBy: { name: string; email: string } | null;
 };
 
+type ImportProvider = "notion" | "google";
+
 export default function OrgDocumentsPage() {
   const [docs, setDocs] = useState<DocRow[] | null>(null);
   const [title, setTitle] = useState("");
@@ -21,6 +29,14 @@ export default function OrgDocumentsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // 외부 가져오기 상태
+  const [importProvider, setImportProvider] = useState<ImportProvider>("notion");
+  const [importList, setImportList] = useState<ImportableDoc[] | null>(null);
+  const [loadingList, setLoadingList] = useState(false);
+  const [importingId, setImportingId] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importNote, setImportNote] = useState<string | null>(null);
 
   useEffect(() => {
     listOrgDocuments()
@@ -46,6 +62,40 @@ export default function OrgDocumentsPage() {
     }
   }
 
+  async function loadImportList() {
+    setLoadingList(true);
+    setImportError(null);
+    setImportNote(null);
+    setImportList(null);
+    try {
+      const res = await listImportableDocuments(importProvider);
+      setImportList(res.documents);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "목록을 불러오지 못했어요.");
+    } finally {
+      setLoadingList(false);
+    }
+  }
+
+  async function doImport(doc: ImportableDoc) {
+    setImportingId(doc.externalId);
+    setImportError(null);
+    setImportNote(null);
+    try {
+      await importIntegrationDocument(importProvider, {
+        externalId: doc.externalId,
+        title: doc.title,
+      });
+      setImportNote(`"${doc.title}"을(를) 가져왔어요.`);
+      const res = await listOrgDocuments();
+      setDocs(res.documents as DocRow[]);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "가져오기에 실패했어요.");
+    } finally {
+      setImportingId(null);
+    }
+  }
+
   return (
     <>
       <Header subtitle="조직 문서 라이브러리" />
@@ -68,6 +118,80 @@ export default function OrgDocumentsPage() {
             </button>
           </div>
         </form>
+
+        <div className="card" style={{ marginTop: 16 }}>
+          <h2 style={{ margin: "0 0 4px", fontSize: 15 }}>외부에서 가져오기</h2>
+          <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 12px" }}>
+            연동된 Notion·Google Drive에서 문서를 직접 가져와 조직 라이브러리에 추가해요.
+            (설정 → 연동에서 먼저 연결이 필요해요.)
+          </p>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <select
+              value={importProvider}
+              onChange={(e) => {
+                setImportProvider(e.target.value as ImportProvider);
+                setImportList(null);
+                setImportError(null);
+                setImportNote(null);
+              }}
+              style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border-strong)" }}
+            >
+              <option value="notion">Notion</option>
+              <option value="google">Google Drive</option>
+            </select>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={loadImportList}
+              disabled={loadingList}
+            >
+              {loadingList ? "불러오는 중..." : "문서 목록 불러오기"}
+            </button>
+          </div>
+
+          {importError && (
+            <div className="error-box" style={{ marginTop: 12 }}>{importError}</div>
+          )}
+          {importNote && (
+            <p style={{ fontSize: 13, color: "var(--accent)", marginTop: 10 }}>{importNote}</p>
+          )}
+
+          {importList && importList.length === 0 && (
+            <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 12 }}>
+              가져올 수 있는 문서가 없어요.
+            </p>
+          )}
+          {importList && importList.length > 0 && (
+            <ul style={{ listStyle: "none", padding: 0, margin: "12px 0 0" }}>
+              {importList.map((d) => (
+                <li
+                  key={d.externalId}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "7px 0",
+                    borderTop: "1px solid var(--border)",
+                    fontSize: 13,
+                  }}
+                >
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {d.title}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => doImport(d)}
+                    disabled={importingId === d.externalId}
+                  >
+                    {importingId === d.externalId ? "가져오는 중..." : "가져오기"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {error && <div className="error-box">{error}</div>}
 
