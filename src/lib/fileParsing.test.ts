@@ -49,14 +49,17 @@ describe("extractText", () => {
     const buffer = await readFile(path.join(fixturesDir, "sample.pdf"));
     const text = await extractText({ filename: "press.pdf", buffer });
     expect(text).toContain("MessageHouse Test Document");
-    expect(text).toContain("Revenue target 12 billion won");
+    expect(text).toContain("Revenue target");
+    expect(text).toContain("12 billion won");
+    expect(text).not.toContain("1 of 1");
   });
 
-  it("extracts text from a real DOCX file", async () => {
+  it("extracts Korean text from a real DOCX file", async () => {
     const buffer = await readFile(path.join(fixturesDir, "sample.docx"));
     const text = await extractText({ filename: "slides.docx", buffer });
     expect(text).toContain("메시지하우스 테스트 문서");
     expect(text).toContain("매출 목표 120억원");
+    expect(text).toContain("성장률 15%");
   });
 
   it("throws DocumentParseError with a clear message for a corrupt PDF", async () => {

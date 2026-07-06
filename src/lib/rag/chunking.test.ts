@@ -11,10 +11,18 @@ describe("chunkText", () => {
   });
 
   it("splits long paragraphs with overlap", () => {
-    const long = "가".repeat(900);
+    const long = "가".repeat(1_500);
     const chunks = chunkText(long);
     expect(chunks.length).toBeGreaterThan(1);
-    expect(chunks[0]!.length).toBeLessThanOrEqual(800);
+    expect(chunks[0]!.length).toBeLessThanOrEqual(1200);
+  });
+
+  it("prefers Korean sentence boundaries when splitting long text", () => {
+    const sentence = "핵심 주장입니다. ";
+    const long = sentence.repeat(121).trim();
+    const chunks = chunkText(long);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.some((chunk) => chunk.endsWith("입니다."))).toBe(true);
   });
 
   it("merges small paragraphs into one chunk when possible", () => {

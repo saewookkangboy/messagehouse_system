@@ -37,6 +37,8 @@ export default function UploadPage({
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pasteTitle, setPasteTitle] = useState("");
+  const [pasteText, setPasteText] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -81,6 +83,17 @@ export default function UploadPage({
     [packId, uploading],
   );
 
+  async function handlePasteText() {
+    const trimmed = pasteText.trim();
+    if (!trimmed || uploading) return;
+    const base = pasteTitle.trim() || `붙여넣은-텍스트-${files.length + 1}`;
+    const filename = base.endsWith(".txt") || base.endsWith(".md") ? base : `${base}.txt`;
+    const file = new File([trimmed], filename, { type: "text/plain" });
+    await handleFiles([file]);
+    setPasteText("");
+    setPasteTitle("");
+  }
+
   async function handleRemove(fileId: string) {
     await deleteFile(packId, fileId);
     setFiles((prev) => prev.filter((f) => f.id !== fileId));
@@ -117,11 +130,10 @@ export default function UploadPage({
       <Stepper current="upload" />
       <main className="page" id="main-content">
         <div className="eyebrow">Step 2</div>
-        <h1 className="page-title">파일을 업로드하세요</h1>
+        <h1 className="page-title">파일을 업로드하거나 텍스트를 붙여넣으세요</h1>
         <p className="page-desc">
-          보도자료·발표자료·기획안 파일을 올리면 분석이 바로 시작돼요. 여러 파일을 한
-          번에 올릴 수 있어요. .txt / .md / .pdf / .docx / .hwp / .hwpx 파일을
-          지원해요.
+          보도자료·발표자료·기획안 파일을 올리거나, 아래에 텍스트를 그대로 붙여넣을 수
+          있어요. .txt / .md / .pdf / .docx / .hwp / .hwpx 파일을 지원해요.
         </p>
 
         {summary && (
@@ -212,6 +224,47 @@ export default function UploadPage({
           </div>
         </div>
 
+        <div className="paste-divider" aria-hidden="true">
+          <span>또는</span>
+        </div>
+
+        <div className="card paste-section">
+          <label htmlFor="paste-title" className="paste-label">
+            문서 이름 <span className="paste-optional">(선택)</span>
+          </label>
+          <input
+            id="paste-title"
+            type="text"
+            className="paste-input"
+            placeholder="예: 보도자료 초안"
+            value={pasteTitle}
+            disabled={uploading}
+            onChange={(e) => setPasteTitle(e.target.value)}
+          />
+          <label htmlFor="paste-text" className="paste-label">
+            텍스트 붙여넣기
+          </label>
+          <textarea
+            id="paste-text"
+            className="paste-textarea"
+            rows={8}
+            placeholder="분석할 텍스트를 복사해서 붙여넣으세요"
+            value={pasteText}
+            disabled={uploading}
+            onChange={(e) => setPasteText(e.target.value)}
+          />
+          <div className="btn-row" style={{ marginTop: 12, marginBottom: 0 }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={!pasteText.trim() || uploading}
+              onClick={handlePasteText}
+            >
+              {uploading ? "추가 중..." : "텍스트 추가"}
+            </button>
+          </div>
+        </div>
+
         {warning && <div className="upload-warning">{warning}</div>}
 
         <div className="filelist">
@@ -243,8 +296,8 @@ export default function UploadPage({
             <path d="M8 11V8a4 4 0 0 1 8 0v3" />
           </svg>
           <span>
-            업로드한 파일 텍스트는 Context Pack 저장에만 사용돼요. 미공개 정보가 포함된
-            파일은 업로드 전에 다시 한번 확인해주세요.
+            업로드·붙여넣기한 텍스트는 Context Pack 저장에만 사용돼요. 미공개 정보가
+            포함된 내용은 추가 전에 다시 한번 확인해주세요.
           </span>
         </div>
 

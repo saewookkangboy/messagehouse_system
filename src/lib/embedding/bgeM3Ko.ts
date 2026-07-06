@@ -73,6 +73,7 @@ export class BgeM3KoEmbeddingProvider implements EmbeddingProvider {
   }
 
   async embedQuery(text: string): Promise<number[]> {
-    return this.request(`Represent this sentence for searching relevant passages: ${text}`);
+    // BGE-m3 계열은 별도 query prefix 없이 대칭 임베딩을 사용해요 (HF 공식 가이드).
+    return this.request(text);
   }
 }

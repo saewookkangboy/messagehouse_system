@@ -12,10 +12,32 @@ import { decryptField, encryptField } from "@/lib/fieldCrypto";
 import { chunkText } from "./chunking";
 import { DEFAULT_TOP_K, type RetrievedChunk } from "./schema";
 
-const RAG_CHAR_BUDGET = 12_000;
+const RAG_CHAR_BUDGET = 16_000;
 const RAG_MIN_TEXT_LENGTH = 4_000;
-const ANALYZE_QUERY =
-  "이 문서의 핵심 주제, 핵심 주장, 수치와 데이터, 공식 용어, 대상 독자, 리스크 문장";
+const ANALYZE_QUERIES = [
+  "이 문서의 핵심 주제와 핵심 주장",
+  "수치 데이터 매출 성장률 목표 실적 지표",
+  "공식 용어 브랜드명 제품명 정책 명칭",
+  "대상 독자 고객층 이해관계자",
+  "리스크 주의사항 금지 표현 법적 고지",
+] as const;
+
+function mergeRankedChunks(
+  lists: RetrievedChunk[][],
+  topK: number,
+): RetrievedChunk[] {
+  const byKey = new Map<string, RetrievedChunk>();
+  for (const list of lists) {
+    for (const chunk of list) {
+      const key = `${chunk.filename}:${chunk.chunkIndex}:${chunk.text}`;
+      const existing = byKey.get(key);
+      if (!existing || chunk.score > existing.score) {
+        byKey.set(key, chunk);
+      }
+    }
+  }
+  return [...byKey.values()].sort((a, b) => b.score - a.score).slice(0, topK);
+}
 
 function newChunkId(): string {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 25);
@@ -187,13 +209,20 @@ export async function buildRagContextForAnalysis(input: {
     return { text: input.text.slice(0, RAG_CHAR_BUDGET), usedRag: false, chunkCount: 0 };
   }
 
-  const ranked = await retrieveRelevantChunks({
-    contextPackId: file.contextPackId,
-    sourceFileId: input.sourceFileId,
-    teamId: input.teamId,
-    query: ANALYZE_QUERY,
-    topK: 8,
-  });
+  const ranked = mergeRankedChunks(
+    await Promise.all(
+      ANALYZE_QUERIES.map((query) =>
+        retrieveRelevantChunks({
+          contextPackId: file.contextPackId,
+          sourceFileId: input.sourceFileId,
+          teamId: input.teamId,
+          query,
+          topK: 6,
+        }),
+      ),
+    ),
+    12,
+  );
 
   const selected: string[] = [];
   let usedChars = 0;

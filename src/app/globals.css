@@ -478,6 +478,52 @@ p.page-desc {
   cursor: wait;
   pointer-events: none;
 }
+.paste-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.paste-divider::before,
+.paste-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-strong);
+}
+.paste-section {
+  display: grid;
+  gap: 8px;
+}
+.paste-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.paste-optional {
+  font-weight: 400;
+}
+.paste-input,
+.paste-textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+}
+.paste-input:focus,
+.paste-textarea:focus {
+  outline: 2px solid #000;
+  outline-offset: 1px;
+}
+.paste-textarea {
+  min-height: 160px;
+  line-height: 1.5;
+}
 .dropzone .dz-icon {
   width: 34px;
   height: 34px;
